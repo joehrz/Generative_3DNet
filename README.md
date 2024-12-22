@@ -1,1 +1,1 @@
-# Tree-GAN-for-3D-Wheat-Point-Cloud-Generation
+# Tree_GAN_for_3D_Wheat_Point_Cloud_Generation
