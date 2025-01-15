@@ -6,7 +6,9 @@ import torch.nn.functional as F
 
 class EncoderDiscriminator(nn.Module):
     """
-    Acts as Encoder (AE direction) or Discriminator (Gan direction)
+    This module acts as:
+      - Encoder (for AE): compresses (B, N, 3) -> latent code of dimension latent_dim
+      - Discriminator (for GAN): produces a scalar real/fake from (B, N, 3)
     """
     def __init__(self, latent_dim=96, d_feat=[3, 64, 128, 256, 512]):
         super(EncoderDiscriminator, self).__init__()
