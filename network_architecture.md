@@ -1,6 +1,6 @@
 # 1. Forward Direction (Auto-Encoder)
 
-Given a real point cloud $ \mathbf{X} \in \mathbb{R}^{N \times 3} $, our goal in the forward direction is to **reconstruct** $ \mathbf{X} $. This direction is basically an **auto-encoder**:
+Given a real point cloud $\mathbf{X} \in \mathbb{R}^{N \times 3}$, our goal in the forward direction is to **reconstruct** $ \mathbf{X} $. This direction is basically an **auto-encoder**:
 
 **Encoder** \( E(\cdot) \):
 $$
@@ -67,23 +67,24 @@ $$
 We adopt a standard **WGAN-GP** objective. For a batch of real data $\mathbf{X}$ and fake data $\widetilde{\mathbf{X}}$:
 
 - **Discriminator Loss**:
-  $$
-  L_{D} \;=\;
-  \mathbb{E}\big[D(\widetilde{\mathbf{X}})\big]
-  \;-\;
-  \mathbb{E}\big[D(\mathbf{X})\big]
-  \;+\;
-  \lambda_{\text{gp}}\;L_{\text{gp}},
-  $$
-  where
-  $$
-  L_{\text{gp}}
-    \;=\;
-    \mathbb{E}_{\hat{\mathbf{x}} \in \text{interp}} \Big[
-      \big(\|\nabla_{\hat{\mathbf{x}}} D(\hat{\mathbf{x}})\|_2 - 1\big)^2
-    \Big],
-  $$
-  is the gradient penalty term enforcing $D$ to be **1-Lipschitz**, and $\hat{\mathbf{x}}$ is a linear interpolation of real and fake points.
+  
+ $$
+L_{D} \;=\;
+\mathbb{E}\big[D(\widetilde{\mathbf{X}})\big]
+\;-\;
+\mathbb{E}\big[D(\mathbf{X})\big]
+\;+\;
+\lambda_{\text{gp}}\;L_{\text{gp}},
+$$
+where
+$$
+L_{\text{gp}}
+\;=\;
+\mathbb{E}_{\hat{\mathbf{x}} \in \text{interp}} \Big[
+\big(\|\nabla_{\hat{\mathbf{x}}} D(\hat{\mathbf{x}})\|_2 - 1\big)^2
+\Big],
+$$
+is the gradient penalty term enforcing $D$ to be **1-Lipschitz**, and $\hat{\mathbf{x}}$ is a linear interpolation of real and fake points.
 
 - **Generator Loss**:
   $$
