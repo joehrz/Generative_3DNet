@@ -68,21 +68,12 @@ We adopt a standard **WGAN-GP** objective. For a batch of real data $\mathbf{X}$
 
 - **Discriminator Loss**:
   
- $$
-L_{D} \;=\;
-\mathbb{E}\big[D(\widetilde{\mathbf{X}})\big]
-\;-\;
-\mathbb{E}\big[D(\mathbf{X})\big]
-\;+\;
-\lambda_{\text{gp}}\;L_{\text{gp}},
+$$
+L_{D} \;=\; \mathbb{E}\big[D(\widetilde{\mathbf{X}})\big] \;-\; \mathbb{E}\big[D(\mathbf{X})\big] \;+\; \lambda_{\text{gp}}\;L_{\text{gp}},
 $$
 where
 $$
-L_{\text{gp}}
-\;=\;
-\mathbb{E}_{\hat{\mathbf{x}} \in \text{interp}} \Big[
-\big(\|\nabla_{\hat{\mathbf{x}}} D(\hat{\mathbf{x}})\|_2 - 1\big)^2
-\Big],
+L_{\text{gp}} \;=\; \mathbb{E}_{\hat{\mathbf{x}} \in \text{interp}} \Big[\big(\|\nabla_{\hat{\mathbf{x}}} D(\hat{\mathbf{x}})\|_2 - 1\big)^2\Big],
 $$
 is the gradient penalty term enforcing $D$ to be **1-Lipschitz**, and $\hat{\mathbf{x}}$ is a linear interpolation of real and fake points.
 
