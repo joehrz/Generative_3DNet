@@ -31,8 +31,8 @@ model:
   # BI-Net Hyperparams
   latent_dim: 96
   # For the generator (decoder) layers
-  features_g: [96, 128, 64, 3]
-  degrees: [4, 4, 4]
+  features_g: [96, 128, 128, 64, 64, 32, 3]
+  degrees: [4, 4, 4, 4, 4, 2]
   support: 10
 
   # For the encoder (discriminator)
