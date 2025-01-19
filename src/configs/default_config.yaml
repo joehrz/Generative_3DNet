@@ -1,0 +1,49 @@
+# File: configs/default_config.yaml
+
+data:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  splits_dir: "data/splits"
+
+  # If you do a manual or intermediate directory, mention it here:
+  # manual_dir: "data/manually_adjustments"
+  
+  split_ratios: [0.7, 0.15, 0.15]  # train, val, test
+
+preprocessing:
+  voxel_size: 0.02
+  num_points: 2048
+  use_fps: true  # whether to do farthest point sampling
+  # example noise augmentation
+  noise_params:
+    mean: 0.0
+    std: 0.02
+
+training:
+  batch_size: 8
+  epochs: 50
+  learning_rate: 0.001
+  betas: [0.9, 0.999]   # for Adam, etc.
+  scheduler_step_size: 20
+  scheduler_gamma: 0.5
+
+model:
+  # BI-Net Hyperparams
+  latent_dim: 96
+  # For the generator (decoder) layers
+  features_g: [96, 128, 64, 3]
+  degrees: [4, 4, 4]
+  support: 10
+
+  # For the encoder (discriminator)
+  enc_disc_feat: [3, 64, 128, 256, 512]
+
+  # Weighted losses
+  lambda_gp: 10.0   # gradient penalty
+  lambda_nnme: 0.05 # NNME repulsion
+  # Whether to decode to 64 points vs. 2048, etc.
+  final_num_points: 2048
+
+  # Directories
+  save_dir: "models/checkpoints"
+  checkpoint_name: "bi_net_checkpoint.pth"
