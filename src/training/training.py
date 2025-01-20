@@ -6,7 +6,7 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 
-from src.datasets.pc_dataset import PointCloudDataset
+from src.dataset.pc_dataset import PointCloudDataset
 from src.models.bi_net import BiNet
 from src.utils.train_utils import train_binet
 from src.utils.emd import emd_loss
