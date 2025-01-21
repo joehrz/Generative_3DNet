@@ -15,19 +15,17 @@ class EncoderDiscriminator(nn.Module):
         self.latent_dim = latent_dim
 
         layers = []
-
         for i in range(len(d_feat) - 1):
             in_ch = d_feat[i]
-            out_ch = d_feat[i+1]
+            out_ch = d_feat[i + 1]
             conv = nn.Conv1d(in_ch, out_ch, kernel_size=1, stride=1)
             layers.append(conv)
             layers.append(nn.LeakyReLU(0.2))
 
-            self.shared_conv = nn.Sequential(*layers)
-
-            # separate heads
-            self.fc_latent = nn.Linear(d_feat[-1], latent_dim)
-            self.fc_disc = nn.Linear(latent_dim, 1)
+        # Define outside the loop
+        self.shared_conv = nn.Sequential(*layers)       # final conv stack
+        self.fc_latent   = nn.Linear(d_feat[-1], latent_dim)
+        self.fc_disc     = nn.Linear(latent_dim, 1)
 
 
     
