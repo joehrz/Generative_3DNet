@@ -8,62 +8,67 @@ from torch.utils.data import Dataset
 class PointCloudDataset(Dataset):
     """
     A dataset class for point-cloud data (optionally with RGB).
-    Assumes data is stored in `root/split` subfolders:
-      e.g. data/processed/train/*.npy or .npz, etc.
+    Expects data files directly under the `root` directory:
+        root/*.npy, root/*.npz, root/*.pt, root/*.txt, etc.
     
     - Supports files: .npy, .npz, .pt, .txt
     - Typically expects arrays of shape (N, 3) for XYZ or (N, 6) for XYZ+RGB.
-    - If using .npz, it looks for a 'points' key by default (or the first array if absent).
-    - Applies an optional transform, then returns a torch.Tensor (float32) of shape (N, D)
-      where D=3 for XYZ or D=6 for XYZRGB, etc.
+    - If using .npz, it looks for a 'points' key by default (or else defaults to the
+      first array found in the file).
+    - An optional transform can be applied to the loaded NumPy array before
+      it is converted to a PyTorch tensor.
     """
 
-    def __init__(self, root='data/processed', split='train', transform=None):
+    def __init__(self, root='data/processed', transform=None):
         """
         Args:
-            root (str): Base directory, e.g. 'data/processed'
-            split (str): Subfolder name, e.g. 'train', 'val', 'test'
+            root (str): Directory containing the data files (e.g. 'data/processed/').
             transform (callable, optional): A function that takes a NumPy array
-                                            and returns a modified NumPy array.
-                                            (Could be augmentations, scaling, etc.)
+                                            and returns a modified NumPy array
+                                            (could be augmentations, scaling, etc.).
         """
         super().__init__()
         self.root = root
-        self.split = split
         self.transform = transform
 
-        # Path to the folder containing files for this split
-        self.file_dir = os.path.join(self.root, self.split)
-        
+        # Check that the directory exists
+        if not os.path.isdir(self.root):
+            raise ValueError(f"Provided root directory does not exist: {self.root}")
+
         # Gather valid files
-        self.files = sorted([
-            f for f in os.listdir(self.file_dir)
-            if f.endswith('.npy') or f.endswith('.npz') or f.endswith('.pt') or f.endswith('.txt')
-        ])
+        self.files = sorted(
+            f
+            for f in os.listdir(self.root)
+            if f.endswith('.npy') or f.endswith('.npz')
+               or f.endswith('.pt')  or f.endswith('.txt')
+        )
+
+        if len(self.files) == 0:
+            raise ValueError(f"No valid point-cloud files found in directory: {self.root}")
 
     def __len__(self):
         return len(self.files)
-    
 
     def __getitem__(self, idx):
-        file_path = os.path.join(self.file_dir, self.files[idx])
+        # Build the full path to the file
+        file_name = self.files[idx]
+        file_path = os.path.join(self.root, file_name)
 
         # Load the file into a NumPy array
         if file_path.endswith('.npy'):
-            pc = np.load(file_path)  # e.g. shape (N, 3) or (N, 6)
+            pc = np.load(file_path)
         elif file_path.endswith('.npz'):
             data = np.load(file_path)
-            # If there's a known key 'points', use it; else fallback to first array
+            # If there's a 'points' key, use it; otherwise fall back to the first array
             if 'points' in data:
                 pc = data['points']
             else:
-                # fallback: grab first array from .npz if no 'points' key
                 arr_keys = list(data.keys())
                 if len(arr_keys) == 0:
                     raise ValueError(f"No arrays found in {file_path}")
                 pc = data[arr_keys[0]]
         elif file_path.endswith('.pt'):
-            # If .pt stored a NumPy or Torch tensor, we handle it
+            # If .pt stored a Torch tensor or a NumPy-like structure
             tensor_data = torch.load(file_path)
             if isinstance(tensor_data, torch.Tensor):
                 pc = tensor_data.cpu().numpy()
@@ -77,9 +82,9 @@ class PointCloudDataset(Dataset):
         # Convert to float32 array
         pc = pc.astype(np.float32)
 
-        # Optional transform/augmentation (could be random rotations, etc.)
+        # Apply optional transform/augmentation
         if self.transform is not None:
-            pc = self.transform(pc)  # still a NumPy array
+            pc = self.transform(pc)
 
-        # Convert to torch Tensor of shape (N, D), float32
+        # Convert to torch.Tensor
         return torch.from_numpy(pc)
