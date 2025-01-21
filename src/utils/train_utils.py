@@ -2,11 +2,70 @@
 
 import torch
 import torch.optim as optim
-from .losses import emd_loss, gradient_penalty, nnme_loss
+# Keep emd_loss imported if you still want to measure it in evaluate_on_loader
+from .losses import chamfer_distance, emd_loss, gradient_penalty, nnme_loss
+
+def evaluate_on_loader_chamfer(model, data_loader, device):
+    """
+    Evaluate model reconstruction using only Chamfer distance.
+    Returns avg Chamfer.
+    """
+    model.eval()
+    total_chamfer = 0.0
+    count = 0
+
+    with torch.no_grad():
+        for real_points in data_loader:
+            real_points = real_points.to(device)
+            B = real_points.size(0)
+
+            # Forward pass
+            latent_code = model.encode(real_points)
+            rec_points  = model.decode(latent_code)
+
+            # Only Chamfer in validation
+            chamfer_val = chamfer_distance(rec_points, real_points).item()
+            total_chamfer += chamfer_val * B
+
+            count += B
+
+    avg_chamfer = total_chamfer / max(count, 1)
+    return avg_chamfer
+
+def evaluate_on_loader_emd_chamfer(model, data_loader, device):
+    """
+    Evaluate model reconstruction with both EMD and Chamfer.
+    Typically used only on test set or final evaluation due to EMD cost.
+    """
+    model.eval()
+    total_emd = 0.0
+    total_chamfer = 0.0
+    count = 0
+
+    with torch.no_grad():
+        for real_points in data_loader:
+            real_points = real_points.to(device)
+            B = real_points.size(0)
+
+            latent_code = model.encode(real_points)
+            rec_points  = model.decode(latent_code)
+
+            emd_val = emd_loss(rec_points, real_points).item()
+            chamfer_val = chamfer_distance(rec_points, real_points).item()
+
+            total_emd += emd_val * B
+            total_chamfer += chamfer_val * B
+
+            count += B
+
+    avg_emd = total_emd / max(count, 1)
+    avg_chamfer = total_chamfer / max(count, 1)
+    return avg_emd, avg_chamfer
 
 def train_binet(
     binet,
     data_loader,
+    val_loader=None,
     device='cuda',
     epochs=50,
     latent_dim=96,
@@ -20,63 +79,44 @@ def train_binet(
     betas_disc=(0.5, 0.9),
     d_iters=1,
     g_iters=1,
-    logger=None
+    logger=None,
+    val_interval=1
 ):
     """
-    Trains BI-Net using a combined auto-encoder + WGAN-GP approach.
+    Trains BI-Net using a combined auto-encoder + WGAN-GP approach,
+    but uses Chamfer distance for the auto-encoder reconstruction loss.
 
-    Steps:
-      1) AE direction (encoder + decoder):
-         - Reconstruct real_points via binet.encode() & binet.decode()
-         - Update encoder (enc) & decoder (dec) optimizers.
-      2) GAN direction (discriminator + generator):
-         - Train discriminator (disc) for 'd_iters' steps:
-            * Use real_points & generated fake_points
-            * Add gradient penalty
-         - Train generator/decoder for 'g_iters' steps:
-            * Minimizes WGAN loss + optional NNME (uniformity)
-    
-    Args:
-        binet (nn.Module): BI-Net model with EnDi & DeGe modules
-        data_loader (DataLoader): yields batches of real_points
-        device (str): 'cuda' or 'cpu'
-        epochs (int): total epochs
-        latent_dim (int): dimension of latent code for random z
-        lambda_gp (float): gradient penalty weight
-        lambda_nnme (float): nearest neighbor mutual exclusion weight
-        lr_enc/lr_dec/lr_disc (float): learning rates for enc/dec/disc
-        betas_enc/betas_dec/betas_disc (tuple): Adam betas for enc/dec/disc
-        d_iters, g_iters (int): how many discriminator/generator steps per iteration
-        logger: optional logging object (logger.info(...)); if None, fallback to print
-
-    Returns:
-        binet (nn.Module): trained BI-Net model
+    If `val_loader` is provided, we do an inline validation pass at the end
+    of each epoch (or every 'val_interval' epochs).
     """
 
     binet.to(device)
 
-    # Separate parameters for encoder vs. decoder vs. disc
-    # In BI-Net, "EnDi" is shared for encoder + disc, so we do a simplistic approach
-    enc_params = list(binet.EnDi.parameters())  # encoder or discriminator
-    dec_params = list(binet.DeGe.parameters())  # decoder/generator
+    # Separate parameters for encoder/discriminator (EnDi) vs. decoder/generator (DeGe)
+    enc_params = list(binet.EnDi.parameters()) 
+    dec_params = list(binet.DeGe.parameters())  
 
+    # Create separate optimizers
     optimizer_enc = optim.Adam(enc_params, lr=lr_enc, betas=betas_enc)
     optimizer_dec = optim.Adam(dec_params, lr=lr_dec, betas=betas_dec)
     optimizer_disc = optim.Adam(enc_params, lr=lr_disc, betas=betas_disc)
 
     global_step = 0
-    for epoch in range(epoch):
+    for epoch in range(epochs):
+        binet.train()  # put model in training mode
+
         for real_points in data_loader:
             real_points = real_points.to(device)
             B = real_points.size(0)
 
             ########################################################
-            # 1) AE direction (Encoder + Decoder)
+            # 1) AE direction (Encoder + Decoder) using Chamfer Loss
             ########################################################
             latent = binet.encode(real_points)
             rec_points = binet.decode(latent)
 
-            ae_loss = emd_loss(rec_points, real_points)
+            # Use chamfer_distance instead of emd_loss
+            ae_loss = chamfer_distance(rec_points, real_points)
 
             optimizer_enc.zero_grad()
             optimizer_dec.zero_grad()
@@ -101,16 +141,16 @@ def train_binet(
                 d_fake = binet.discriminate(fake_points)
 
                 gp = gradient_penalty(
-                    discriminator=binet.discriminate,
-                    real_data=real_points,
-                    fake_data=fake_points,
+                    binet.discriminate,
+                    real_points,
+                    fake_points,
                     device=device
                 )
                 disc_loss = d_fake.mean() - d_real.mean() + lambda_gp * gp
 
                 disc_loss.backward()
                 optimizer_disc.step()
-   
+
             # 2.2) Train Generator (Decoder)
             for _ in range(g_iters):
                 optimizer_dec.zero_grad()
@@ -132,12 +172,23 @@ def train_binet(
             # Logging or printing
             if global_step % 10 == 0:
                 msg = (f"[Epoch {epoch}/{epochs}] [Step {global_step}] "
-                       f"AE_loss: {ae_loss.item():.4f} | "
+                       f"AE_loss(Chamfer): {ae_loss.item():.4f} | "
                        f"D_loss: {disc_loss.item():.4f} | "
                        f"G_loss: {g_loss.item():.4f} | "
                        f"Unif: {unif_loss.item():.4f}")
 
-                logger.info(msg)
 
+                print(msg)
+
+        # ---------------------------
+        # End of an epoch - do validation
+        # ---------------------------
+        # Validation with CHAMFER ONLY
+        if val_loader is not None and (epoch + 1) % val_interval == 0:
+            binet.eval()
+            val_chamfer = evaluate_on_loader_chamfer(binet, val_loader, device)
+            msg_val = f"[Epoch {epoch}/{epochs}] Validation => Chamfer: {val_chamfer:.4f}"
+            print(msg_val)
 
     return binet
+
