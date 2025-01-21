@@ -1,15 +1,44 @@
 import torch
-import torch.nn.functional as f
+import torch.nn.functional as F
+from scipy.optimize import linear_sum_assignment
 
+def chamfer_distance(pc1, pc2):
+    """Compute Chamfer Distance between two point clouds."""
+    B, N, _ = pc1.size()
+    M = pc2.size(1)
 
-def emd_loss(pred_points, gt_points):
+    pc1_expand = pc1.unsqueeze(2).expand(B, N, M, 3)
+    pc2_expand = pc2.unsqueeze(1).expand(B, N, M, 3)
+    dist = torch.norm(pc1_expand - pc2_expand, dim=3)  # [B, N, M]
+
+    min_dist_pc1, _ = torch.min(dist, dim=2)  # [B, N]
+    min_dist_pc2, _ = torch.min(dist, dim=1)  # [B, M]
+
+    loss = torch.mean(min_dist_pc1) + torch.mean(min_dist_pc2)
+    return loss
+
+def emd_loss(pc1, pc2):
     """
-    Placeholder for real Earth Mover's Distance or Chamfer Distance.
-    For demonstration, use MSE.
+    Compute the Earth Mover's Distance (EMD) between two point clouds
+    pc1 and pc2 of shape [B, N, D].
+
+    This uses the Hungarian algorithm (from SciPy) under the hood.
+    Returns a scalar tensor (float) with the average EMD over the batch.
     """
-    return torch.mean((pred_points - gt_points)**2)
+    assert pc1.dim() == 3 and pc2.dim() == 3, "Point clouds must be [B, N, D]"
+    B, N, D = pc1.shape
+    emd_total = 0.0
 
+    for b in range(B):
+        dist_matrix = torch.cdist(pc1[b].unsqueeze(0), pc2[b].unsqueeze(0), p=2)[0] ** 2
+        cost_matrix = dist_matrix.detach().cpu().numpy()
 
+        row_idx, col_idx = linear_sum_assignment(cost_matrix)
+        emd_b = cost_matrix[row_idx, col_idx].sum() / N
+        emd_total += emd_b
+
+    emd_avg = emd_total / B
+    return torch.tensor(emd_avg, dtype=torch.float32, device=pc1.device)
 
 def gradient_penalty(discriminator, real_points, fake_points, device='cuda'):
     alpha = torch.rand(real_points.size(0), 1, 1, device=device)
@@ -28,9 +57,8 @@ def gradient_penalty(discriminator, real_points, fake_points, device='cuda'):
         retain_graph=True,
         only_inputs=True
     )[0]
-    grads = grads.view(grads.size(0), -1)
+    grads = grads.contiguous().view(grads.size(0), -1)
     gp = ((grads.norm(2, dim=1) - 1)**2).mean()
-    
     return gp
 
 def nnme_loss(point_clouds, sample_fraction=0.1):
@@ -50,13 +78,17 @@ def nnme_loss(point_clouds, sample_fraction=0.1):
         sub_shape = shape[idx]  # (subset_size, 3)
         
         dist_matrix = torch.cdist(sub_shape, sub_shape, p=2)  # (subset_size, subset_size)
-        # We only consider the minimum nonzero distance for each point
-        dist_matrix.fill_diagonal_(1e6)
-        min_dists = torch.min(dist_matrix, dim=1)[0]
-        
+
+        # Instead of in-place fill, clone first
+        dist_clone = dist_matrix.clone()
+        dist_clone.fill_diagonal_(1e6)
+        # Now compute min dists
+        min_dists = torch.min(dist_clone, dim=1)[0]
+
         # variance of min distances
         variance = torch.var(min_dists)
         losses.append(variance)
+
     if losses:
         return torch.mean(torch.stack(losses))
     else:
