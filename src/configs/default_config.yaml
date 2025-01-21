@@ -1,9 +1,23 @@
 # File: configs/default_config.yaml
 
+# data:
+#   raw_dir: "data/raw"
+#   processed_dir: "data/processed"
+#   splits_dir: "data/splits"    # optional
+#   splits:
+#     train_dir: "data/splits/train"
+#     val_dir: "data/splits/val"
+#     test_dir: "data/splits/test"
+
 data:
-  raw_dir: "data/raw"
+  raw_dir: "shape_net_data/chairs_03001627"
   processed_dir: "data/processed"
-  splits_dir: "data/splits"
+  splits_dir: "data/splits"    # optional
+  splits:
+    train_dir: "data/splits/train"
+    val_dir: "data/splits/val"
+    test_dir: "data/splits/test"
+
 
   # If you do a manual or intermediate directory, mention it here:
   # manual_dir: "data/manually_adjustments"
@@ -12,7 +26,7 @@ data:
 
 preprocessing:
   voxel_size: 0.02
-  num_points: 2048
+  num_points: 4096
   use_fps: true  # whether to do farthest point sampling
   # example noise augmentation
   noise_params:
@@ -20,7 +34,7 @@ preprocessing:
     std: 0.02
 
 training:
-  batch_size: 8
+  batch_size: 16
   epochs: 50
   learning_rate: 0.001
   betas: [0.9, 0.999]   # for Adam, etc.
@@ -32,7 +46,7 @@ model:
   latent_dim: 96
   # For the generator (decoder) layers
   features_g: [96, 128, 128, 64, 64, 32, 3]
-  degrees: [4, 4, 4, 4, 4, 2]
+  degrees: [2, 2, 2, 2, 2, 128]
   support: 10
 
   # For the encoder (discriminator)
@@ -42,7 +56,7 @@ model:
   lambda_gp: 10.0   # gradient penalty
   lambda_nnme: 0.05 # NNME repulsion
   # Whether to decode to 64 points vs. 2048, etc.
-  final_num_points: 2048
+  final_num_points: 4096
 
   # Directories
   save_dir: "models/checkpoints"

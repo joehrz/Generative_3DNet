@@ -39,5 +39,7 @@ images
 # MacOS specific
 .DS_Store
 
+# textfiles 
+.txt
 # Personal textfiles for notes
 notes.txt
