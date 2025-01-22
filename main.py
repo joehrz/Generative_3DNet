@@ -50,6 +50,8 @@ def parse_args():
                         help="Number of points after unify step.")
     parser.add_argument("--use_fps", action="store_true",
                         help="Use farthest point sampling to preserve structure.")
+    parser.add_argument("--skip_downsample", action="store_true",
+                        help="Skip voxel downsampling entirely if set.")
 
     # Splitting flags
     parser.add_argument("--split", action="store_true",
@@ -100,9 +102,9 @@ def main():
             output_dir=config.data.processed_dir,  # e.g. "data/processed"         
             voxel_size=config.preprocessing.voxel_size,
             num_points=config.preprocessing.num_points,
-            file_ext=".ply",  # or ".npz" depending on your pipeline
-            use_fps=config.preprocessing.use_fps
-        )
+            use_fps=config.preprocessing.use_fps,
+            skip_downsample=args.skip_downsample
+            )
         logger.info("Preprocessing completed.")
 
     #######################################
