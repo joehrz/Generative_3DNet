@@ -40,6 +40,37 @@ def emd_loss(pc1, pc2):
     emd_avg = emd_total / B
     return torch.tensor(emd_avg, dtype=torch.float32, device=pc1.device)
 
+
+def evaluate_on_loader_emd_chamfer(model, data_loader, device):
+    """
+    Evaluate model reconstruction with both EMD and Chamfer.
+    Typically used only on test set or final evaluation due to EMD cost.
+    """
+    model.eval()
+    total_emd = 0.0
+    total_chamfer = 0.0
+    count = 0
+
+    with torch.no_grad():
+        for real_points in data_loader:
+            real_points = real_points.to(device)
+            B = real_points.size(0)
+
+            latent_code = model.encode(real_points)
+            rec_points  = model.decode(latent_code)
+
+            emd_val = emd_loss(rec_points, real_points).item()
+            chamfer_val = chamfer_distance(rec_points, real_points).item()
+
+            total_emd += emd_val * B
+            total_chamfer += chamfer_val * B
+
+            count += B
+
+    avg_emd = total_emd / max(count, 1)
+    avg_chamfer = total_chamfer / max(count, 1)
+    return avg_emd, avg_chamfer
+
 def gradient_penalty(discriminator, real_points, fake_points, device='cuda'):
     alpha = torch.rand(real_points.size(0), 1, 1, device=device)
     alpha = alpha.expand_as(real_points)

@@ -25,13 +25,16 @@ training:
   scheduler_gamma: 0.5
 
 model:
-  latent_dim: 96
-  features_g: [96, 128, 128, 64, 64, 32, 3]
+  latent_dim: 128
+  #features_g: [96, 128, 128, 64, 64, 32, 3]
   # IMPORTANT: set 'degrees' so the product = 2048
   # (1 x 2 x 2 x 2 x 2 x 2 x 64 = 2048)
-  degrees: [2, 2, 2, 2, 2, 64]
+  #degrees: [2, 2, 2, 2, 2, 64]
+  features_g: [128, 256, 256, 256, 128, 128, 128, 3]
+  degrees: [1, 2, 2, 2, 2, 2, 64]
   support: 10
-  enc_disc_feat: [3, 64, 128, 256, 512]
+  ae_enc_feat:  [3, 64, 128, 256, 512]
+  disc_hidden: [256, 128]
   lambda_gp: 10.0
   lambda_nnme: 0.05
   final_num_points: 2048  # just a reference if your code checks it

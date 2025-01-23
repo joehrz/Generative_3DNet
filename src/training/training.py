@@ -7,7 +7,9 @@ from torch.utils.data import DataLoader
 
 from src.dataset.pc_dataset import PointCloudDataset
 from src.models.bi_net import BiNet
-from src.utils.train_utils import train_binet, evaluate_on_loader_emd_chamfer
+from src.utils.train_utils import train_binet
+from src.utils.losses import evaluate_on_loader_emd_chamfer
+
 
 #PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 #sys.path.append(PROJECT_ROOT)
@@ -67,18 +69,19 @@ def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_gene
     batch_size    = config.training.batch_size
     features_g    = config.model.features_g
     degrees       = config.model.degrees
-    enc_disc_feat = config.model.enc_disc_feat
+    ae_enc_feat = config.model.ae_enc_feat
+    disc_hidden   = config.model.disc_hidden
     support       = config.model.support
 
     binet = BiNet(
         batch_size=batch_size,
+        ae_enc_feat=ae_enc_feat,
+        latent_dim=latent_dim,
+        disc_hidden=disc_hidden,
         features_g=features_g,
         degrees=degrees,
-        enc_disc_feat=enc_disc_feat,
-        latent_dim=latent_dim,
         support=support
     ).to(device)
-
 
     # Load checkpoint if needed
     ckpt_path = os.path.join(config.model.save_dir, config.model.checkpoint_name)
