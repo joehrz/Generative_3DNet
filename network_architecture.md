@@ -1,236 +1,219 @@
-# 1. Forward Direction (Auto-Encoder)
+# BI‐Net Overview
 
-Given a real point cloud $\mathbf{X} \in \mathbb{R}^{N \times 3}$, our goal in the forward direction is to **reconstruct** $\mathbf{X}$. This direction is essentially an **auto-encoder**.
+**BI‐Net** is a **bidirectional network** that unifies:
 
-## Encoder
+1. An **auto‐encoder (AE) direction**: real point clouds \(\mathbf{X} \to \mathbf{z} \to \widehat{\mathbf{X}}\).  
+2. A **GAN direction**: random noise \(\mathbf{z} \to \widetilde{\mathbf{X}}\), plus a discriminator to distinguish real vs. fake.
 
-We define the encoder \( E(\cdot) \) as follows:
+The **decoder** in both directions is the same **TreeGCN** module. The **encoder** and **discriminator** can share parameters or be closely related modules.
 
-$$
-\mathbf{z} = E(\mathbf{X}) \in \mathbb{R}^d,
-$$
+---
 
-where \(d\) is the latent (embedding) dimension, e.g., \(d=96\). This is done by the **En–Di** module in “encoder” mode.
+## 1. Forward Direction (Auto‐Encoder)
 
-## Decoder
+Given a real point cloud \(\mathbf{X} \in \mathbb{R}^{N \times 3}\), the AE direction attempts to **reconstruct** \(\mathbf{X}\). This forms an **auto‐encoder** path.
 
-Next, the decoder \( \text{De}(\cdot) \) reconstructs a point cloud:
+### Encoder
 
-$$
-\widehat{\mathbf{X}} = \text{De}(\mathbf{z}) \in \mathbb{R}^{N \times 3}.
-$$
+We define an encoder \(E(\cdot)\):
 
-This is the **De–Ge** (TreeGCN) network in “decoder” mode, expanding the latent code $\mathbf{z}$ back to $N$ 3D points.
+\[
+\mathbf{z} = E(\mathbf{X}) 
+\quad 
+\in 
+\mathbb{R}^d,
+\]
+
+where \(d\) is the latent dimension. This might be implemented via point‐cloud convolutions or an MLP.
+
+### Decoder
+
+Next, a decoder \(\text{De}(\cdot)\) reconstructs the point cloud:
+
+\[
+\widehat{\mathbf{X}} = \text{De}(\mathbf{z})
+\quad
+\in
+\mathbb{R}^{N \times 3}.
+\]
+
+Typically, this **TreeGCN** expands \(\mathbf{z}\) from a small node set to \(N\) final 3D points.
 
 ### Reconstruction Loss
 
-We typically measure how close $\widehat{\mathbf{X}}$ is to $\mathbf{X}$. Common choices are **Chamfer Distance** or **Earth Mover’s Distance (EMD)**. For instance, if we use Chamfer Distance:
+We measure how close the reconstruction \(\widehat{\mathbf{X}}\) is to the real \(\mathbf{X}\). Common choices:
 
-$$
-d_{\text{Chamfer}}(\mathbf{X}, \widehat{\mathbf{X}}) = 
-\sum_{\mathbf{x} \in \mathbf{X}} \min_{\hat{\mathbf{x}} \in \widehat{\mathbf{X}}} \|\mathbf{x} - \hat{\mathbf{x}}\|_2
-\;+\;
-\sum_{\hat{\mathbf{x}} \in \widehat{\mathbf{X}}} \min_{\mathbf{x} \in \mathbf{X}} \|\hat{\mathbf{x}} - \mathbf{x}\|_2,
-$$
+- **Chamfer Distance**:
 
-or if we use EMD:
+  \[
+  d_{\mathrm{Chamfer}}(\mathbf{X}, \widehat{\mathbf{X}})
+  =
+  \sum_{\mathbf{x}\,\in\,\mathbf{X}}
+    \min_{\hat{\mathbf{x}}\,\in\,\widehat{\mathbf{X}}}
+    \|\mathbf{x} - \hat{\mathbf{x}}\|_2
+  \;+\;
+  \sum_{\hat{\mathbf{x}}\,\in\,\widehat{\mathbf{X}}}
+    \min_{\mathbf{x}\,\in\,\mathbf{X}}
+    \|\hat{\mathbf{x}} - \mathbf{x}\|_2.
+  \]
 
-$$
-d_{\text{EMD}}(\mathbf{X}, \widehat{\mathbf{X}}) = 
-\min_{\phi: \widehat{\mathbf{X}} \to \mathbf{X}}
-\sum_{\hat{\mathbf{x}} \in \widehat{\mathbf{X}}} \|\hat{\mathbf{x}} - \phi(\hat{\mathbf{x}})\|_2.
-$$
+- **EMD** (Earth Mover’s Distance).  
 
-Then, the **auto-encoder loss** for the forward direction is:
+Hence, the **AE loss** is:
 
-$$
-L_{\text{AE}} =
-\mathbb{E}_{\mathbf{X} \in \text{data}}\big[d(\mathbf{X}, \widehat{\mathbf{X}})\big],
-$$
+\[
+L_{\mathrm{AE}}
+=
+\mathbb{E}_{\mathbf{X}}\bigl[
+  d(\mathbf{X}, \widehat{\mathbf{X}})
+\bigr].
+\]
 
-where \(d(\cdot)\) is our chosen distance (Chamfer or EMD).
+where \(d(\cdot)\) could be **Chamfer** or **EMD**.
 
 ---
 
-# 2. Reverse Direction (Generative Adversarial Network)
+## 2. Reverse Direction (GAN)
 
-In the reverse direction, we train the **same** modules as a **GAN**.
+In the **reverse** direction, BI‐Net uses the **same decoder** as a **generator**, plus a **discriminator** that can share parameters with the encoder.
 
-## Generator
+### Generator
 
-We define the generator \( G(\cdot) \) as follows:
+A random latent vector \(\mathbf{z} \sim \mathcal{N}(0,\mathbf{I})\) is mapped to fake point clouds:
 
-$$
-\widetilde{\mathbf{X}} = G(\mathbf{z}), \quad \mathbf{z} \sim \mathcal{N}(0, \mathbf{I}).
-$$
+\[
+\widetilde{\mathbf{X}} = G(\mathbf{z}).
+\]
 
-Here, the **De–Ge** (TreeGCN) module runs in “generator” mode, mapping random latent vectors $\mathbf{z}$ to **fake** 3D point clouds $\widetilde{\mathbf{X}}$.
+The module \(G(\cdot)\) can be the same **TreeGCN** used by the decoder.
 
-## Discriminator
+### Discriminator
 
-For any point cloud (real or fake), the **En–Di** network in “discriminator” mode outputs a scalar:
+For real or fake point clouds, a discriminator \(D(\cdot)\) outputs a scalar score. In BI‐Net, this might share layers with the encoder.
 
-$$
-D(\mathbf{X}) \quad \text{or} \quad D(\widetilde{\mathbf{X}}) \quad \in \mathbb{R}.
-$$
+---
 
-### Wasserstein GAN Loss (with Gradient Penalty)
+#### WGAN‐GP Objective
 
-We adopt a standard **WGAN-GP** objective. For a batch of real data $\mathbf{X}$ and fake data $\widetilde{\mathbf{X}}$:
+We employ **Wasserstein GAN** with Gradient Penalty:
 
-#### Discriminator Loss
+- **Discriminator loss**:
 
-$$
-L_{D} =
-\mathbb{E}\big[D(\widetilde{\mathbf{X}})\big]
--
-\mathbb{E}\big[D(\mathbf{X})\big]
+  \[
+  L_{D}
+  =
+  \mathbb{E}\bigl[D(\widetilde{\mathbf{X}})\bigr]
+  \;-\;
+  \mathbb{E}\bigl[D(\mathbf{X})\bigr]
+  \;+\;
+  \lambda_{\mathrm{gp}}\;L_{\mathrm{gp}},
+  \]
+
+  where
+
+  \[
+  L_{\mathrm{gp}}
+  =
+  \mathbb{E}_{\hat{\mathbf{x}}\in\mathrm{interp}}
+  \Bigl[
+    \bigl(\|\nabla_{\hat{\mathbf{x}}}\,D(\hat{\mathbf{x}})\|_2 - 1\bigr)^2
+  \Bigr].
+  \]
+
+- **Generator loss**:
+
+  \[
+  L_{G} 
+  = 
+  -\,\mathbb{E}\bigl[D(\widetilde{\mathbf{X}})\bigr].
+  \]
+
+##### Optional Uniformity (NNME) Loss
+
+We can add a **Nearest Neighbor Mutual Exclusion (NNME)** term to encourage uniform point placement:
+
+\[
+L_{\mathrm{NNME}}\bigl(\widetilde{\mathbf{X}}\bigr),
+\]
+which penalizes highly clustered points. Then the generator’s total cost is:
+
+\[
+L_{G}^{\mathrm{total}}
+=
+L_{G}
 +
-\lambda_{\text{gp}}\,L_{\text{gp}},
-$$
-
-where
-
-$$
-L_{\text{gp}} = \mathbb{E}_{\hat{\mathbf{x}} \in \text{interp}}
-\Big[
-  \big(\|\nabla_{\hat{\mathbf{x}}} D(\hat{\mathbf{x}})\|_2 - 1\big)^2
-\Big],
-$$
-
-is the gradient penalty term enforcing $D$ to be **1-Lipschitz**, and $\hat{\mathbf{x}}$ is a linear interpolation of real and fake points.
-
-#### Generator Loss
-
-$$
-L_{G} = -\,\mathbb{E}[D(\widetilde{\mathbf{X}})].
-$$
-
-The generator attempts to **maximize** $D(\widetilde{\mathbf{X}})$.
-
-#### Optional NNME Loss
-
-Additionally, to encourage **uniform** point distributions, we can include a “Nearest Neighbor Mutual Exclusion” penalty, $L_{\text{NNME}}$. A simplified version is:
-
-$$
-L_{\text{NNME}}(\widetilde{\mathbf{X}})
-  =
-  \mathrm{Var}\!\Big(
-    \min_{\mathbf{x}' \in \widetilde{\mathbf{X}}} \|\mathbf{x} - \mathbf{x}'\|
-  \Big),
-$$
-
-across all pairs or subsets of pairs in $\widetilde{\mathbf{X}}$. Then the generator’s total objective might be:
-
-$$
-L_{G}^{\text{total}}
-  =
-  L_G
-  +
-  \lambda_{\text{NNME}}\,
-  L_{\text{NNME}}(\widetilde{\mathbf{X}}).
-$$
-
-Hence, for the **GAN direction**, we have a **2-player minimax** problem:
-
-$$
-\min_{G} \max_{D} 
-  \quad
-  \mathbb{E}_{\mathbf{X}\in \text{data}}[D(\mathbf{X})]
-  -
-  \mathbb{E}_{\mathbf{z}}[D(G(\mathbf{z}))] 
-  +
-  (\text{gradient penalty} + \text{NNME, etc.}).
-$$
+\lambda_{\mathrm{NNME}}
+\,L_{\mathrm{NNME}}\bigl(\widetilde{\mathbf{X}}\bigr).
+\]
 
 ---
 
-# 3. TreeGCN Expansion (Decoder/Generator Math)
+## 3. BI‐Net Training Strategy
 
-Inside the **Decoder–Generator** (“De–Ge”) we have **TreeGCN** layers that progressively “branch” from a small number of latent nodes to a larger set of nodes. A simplified notation might be:
+Each iteration has **two phases**:
 
-1. Start with $\mathbf{z} \in \mathbb{R}^{1 \times d}$ (one root node per shape).  
-2. At layer $\ell$ (where $\ell = 1,\dots,L$), we have $\mathbf{P}^{(\ell-1)} \in \mathbb{R}^{n_{\ell-1} \times c_{\ell-1}}$. We apply a “branching + transform” step:
-   $$
-   \mathbf{P}^{(\ell)} = f_{\text{TreeGCN}}^{(\ell)}(\mathbf{P}^{(\ell-1)}),
-   $$
-   which **upsamples** from $n_{\ell-1}$ nodes to $n_{\ell} = n_{\ell-1} \times \text{degree}_{\ell}$ nodes.  
-3. Eventually, $\mathbf{P}^{(L)}$ yields $\mathbf{X} \in \mathbb{R}^{N \times 3}$ (the final point cloud).
+1. **AE direction**  
+   - Encode real \(\mathbf{X} \to \mathbf{z}\), then decode \(\widehat{\mathbf{X}}=\text{De}(\mathbf{z})\).  
+   - Minimize \(d(\mathbf{X},\widehat{\mathbf{X}})\).
 
-Concretely, if each TreeGCN layer does something like:
+2. **GAN direction**  
+   - Generate \(\widetilde{\mathbf{X}}=G(\mathbf{z})\) from random noise.  
+   - Update \(\max D\), \(\min G\) via WGAN‐GP (+ optional NNME).  
 
-$$
-\mathbf{P}^{(\ell)}
-  =
-  \text{Branch}(\mathbf{P}^{(\ell-1)})
-  +
-  \text{Loop}(\mathbf{P}^{(\ell-1)})
-  +
-  \text{BiasTerm},
-$$
-
-and each module is a small MLP or linear transform (like $\mathbf{W}_{\text{root}}, \mathbf{W}_{\text{branch}}, \mathbf{W}_{\text{loop}}$), then you get a **hierarchical expansion** from a single latent node to a large set of 3D coordinates.
+Because the encoder and discriminator can share parameters, the **AE** training helps the network learn better geometric features, while the **GAN** training forces the generator to produce more realistic shapes. This **collaborative** approach stabilizes learning and often yields higher‐quality point clouds.
 
 ---
 
-# 4. Putting It All Together: BI-Net Objective
+## TreeGCN Pipeline
 
-**BI-Net** combines:
+Given \(\mathbf{X}^{(l)} \in \mathbb{R}^{B \times N \times d_{\mathrm{in}}}\), a **single** TreeGCN layer outputs \(\mathbf{X}^{(l+1)} \in \mathbb{R}^{B \times (N \cdot \mathrm{degree}) \times d_{\mathrm{out}}}\).  
+Let:
 
-### Auto-Encoder Objective
+- \(\mathbf{W}_{\mathrm{root}} \in \mathbb{R}^{d_{\mathrm{in}} \times d_{\mathrm{out}}}\),  
+- \(\mathbf{W}_{\mathrm{branch}} \in \mathbb{R}^{d_{\mathrm{in}} \times (d_{\mathrm{in}} \cdot \mathrm{degree})}\),  
+- \(\mathbf{W}_{\mathrm{loop}}\) (MLP from \(d_{\mathrm{in}}\) to \(d_{\mathrm{out}}\)),  
+- \(\mathbf{b} \in \mathbb{R}^{\mathrm{degree} \times d_{\mathrm{out}}}\).
 
-$$
-L_{\text{AE}}
-  =
-  \mathbb{E}_{\mathbf{X}}
-    \big[
-      d(\mathbf{X}, \text{De}( E(\mathbf{X}) ))
-    \big],
-$$
+For each node \(\mathbf{x}_{b,n} \in \mathbb{R}^{d_{\mathrm{in}}}\):
 
-where $d$ could be **EMD** or **Chamfer**.
+1. **Root transform**  
+   \[
+   \mathbf{r}_{b,n}
+   =
+   \mathbf{x}_{b,n}\,\mathbf{W}_{\mathrm{root}}
+   \;\;\in\;\;\mathbb{R}^{d_{\mathrm{out}}}.
+   \]
 
-### GAN Objective (WGAN-GP + Optional NNME)
+2. **Branch transform**  
+   \[
+   \mathbf{z}_{b,n}
+   =
+   \mathbf{x}_{b,n}\,\mathbf{W}_{\mathrm{branch}}
+   \;\;\in\;\;\mathbb{R}^{d_{\mathrm{in}}\cdot\mathrm{degree}}.
+   \]
+   Reshape into \(\mathbf{z}_{b,n}^{(k)} \in \mathbb{R}^{d_{\mathrm{in}}}\), \(k=1,\dots,\mathrm{degree}\).
 
-$$
-\min_{G} \max_{D} 
-  \quad
-  \mathbb{E}_{\mathbf{X}}[D(\mathbf{X})]
-  -
-  \mathbb{E}_{\mathbf{z}}[D(G(\mathbf{z}))] 
-  +
-  \lambda_{\text{gp}}\,L_{\text{gp}}
-  +
-  \lambda_{\text{NNME}}\,L_{\text{NNME}}.
-$$
+3. **Loop transform** each child  
+   \[
+   \hat{\mathbf{z}}_{b,n}^{(k)}
+   =
+   \mathbf{W}_{\mathrm{loop}}\bigl(\mathbf{z}_{b,n}^{(k)}\bigr)
+   \;\;\in\;\;\mathbb{R}^{d_{\mathrm{out}}}.
+   \]
 
-In practice, training proceeds in **two steps** each iteration:
+4. **Combine root + branch**  
+   \[
+   \mathbf{y}_{b,n}^{(k)}
+   =
+   \mathbf{r}_{b,n}
+   +
+   \hat{\mathbf{z}}_{b,n}^{(k)}
+   +
+   \mathbf{b}^{(k)}.
+   \]
+   Then apply an activation (e.g., LeakyReLU).
 
-1. **Forward direction (Auto-Encoder step)**  
-   - Freeze or partially freeze the “discriminator” function.  
-   - Encode real $\mathbf{X}$ into $\mathbf{z}$, decode to $\widehat{\mathbf{X}}$.  
-   - Update parameters to minimize $L_{\text{AE}}$.
+Hence each parent node \((b,n)\) spawns \(\mathrm{degree}\) children. Stacking multiple layers grows from 1 (or a few) nodes up to \(N\) final points.
 
-2. **Reverse direction (GAN step)**  
-   - Freeze or partially freeze the “encoder” function.  
-   - Generate $\widetilde{\mathbf{X}} = G(\mathbf{z})$ from noise $\mathbf{z}$.  
-   - Discriminate real vs. fake.  
-   - Update parameters w.r.t. the WGAN objective (+ optional NNME).
+---
 
-Because the **encoder** shares parameters with the **discriminator** (they are the same module “En–Di” in different modes), the AE step “guides” part of the network to learn useful geometry features, while the GAN step forces the generator to create realistic shapes that fool the discriminator. This **collaborative training** often stabilizes learning with relatively few shapes.
-
-**Summary**:
-- **Forward (AE) direction**:  
-  $$
-    \mathbf{z} = E(\mathbf{X}), \quad
-    \widehat{\mathbf{X}} = \text{De}(\mathbf{z}), \quad
-    L_{\text{AE}} = d(\widehat{\mathbf{X}}, \mathbf{X}).
-  $$
-
-- **Reverse (GAN) direction**:  
-  $$
-    \widetilde{\mathbf{X}} = G(\mathbf{z}), \quad
-    \text{GAN Loss} = L_D(\mathbf{X}, \widetilde{\mathbf{X}}) + L_G(\widetilde{\mathbf{X}}).
-  $$
-
-- **TreeGCN** expansions build the final shape from a small latent code.
