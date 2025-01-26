@@ -2,35 +2,33 @@
 
 > **Note**: This project is still a **work in progress**.
 
-Implementation of the BI-Net paper:  
+This is an implementation of the BI-Net paper:  
 [**3D Point Cloud Shape Generation with Collaborative Learning of Generative Adversarial Network and Auto-Encoder**](https://www.mdpi.com/2072-4292/16/10/1772)
 
-**BI-Net** (Bidirectional Network) is a **collaborative** Auto-Encoder (AE) + Generative Adversarial Network (GAN) designed for **3D point-cloud** data. Leveraging **TreeGCN** expansions, BI-Net can **reconstruct** real point clouds (forward AE direction) and **generate** new shapes (reverse GAN direction). This approach is particularly well-suited to limited 3D datasets (e.g., wheat plants), using the AE to guide the GAN’s discriminator and generator.
+**BI-Net** (Bidirectional Network) is a **collaborative** Auto-Encoder (AE) and Generative Adversarial Network (GAN) for **3D point-cloud** data. Using **TreeGCN** expansions, BI-Net can **reconstruct** real point clouds in one direction and **generate** new shapes in the other direction. This approach is particularly suited for limited 3D datasets (like wheat plants), leveraging an AE to guide the GAN’s discriminator and generator.
 
 ---
 
 ## Features
 
-1. **Forward (AE) Direction**  
-   - Encodes real point clouds \(\mathbf{X}\) into a latent code \(\mathbf{z}\).  
-   - Reconstructs \(\mathbf{X}\) via TreeGCN-based decoding.  
-   - Supports Chamfer/EMD loss for high‐fidelity reconstruction.
+- **Forward (AE) Direction**  
+  - Encodes real point clouds into a latent code and reconstructs them via TreeGCN-based decoding.
+  - Supports Chamfer/EMD loss for reconstruction fidelity.
 
-2. **Reverse (GAN) Direction**  
-   - Generates point clouds from random noise, discriminated by a shared “En–Di” module.  
-   - Implements **Wasserstein GAN** with Gradient Penalty (WGAN-GP) for stable training.  
-   - Includes optional **NNME** (Nearest Neighbor Mutual Exclusion) loss to ensure uniform point distribution.
+- **Reverse (GAN) Direction**  
+  - Generates point clouds from random noise, discriminated by the shared “En–Di” module.
+  - Implements Wasserstein GAN with Gradient Penalty (WGAN-GP) for stable training.
+  - Optional **NNME** (Nearest Neighbor Mutual Exclusion) loss for uniform point distribution.
 
-3. **TreeGCN Expansion**  
-   - Hierarchical branching from a small latent code to a large set of 3D points.  
-   - Flexible configuration (layers/degrees) for different shape complexities.
+- **TreeGCN Expansion**  
+  - Hierarchical branching from a small latent code to a large set of 3D points.
+  - Flexible degrees / layers for different shape complexity.
 
-4. **Data Preprocessing**  
-   - Voxel‐based downsampling and/or farthest point sampling for consistent point counts.  
-   - Normalization to a unit sphere, plus optional random noise augmentation.
+- **Data Preprocessing**  
+  - Voxel-based downsampling, farthest point sampling to unify point counts, normalization to a unit sphere.
 
-5. **Multi‐Notebook Workflow**  
-   - Explore data, model architectures, training procedures, and evaluation routines in separate Jupyter notebooks (if provided).
+- **Multiple Notebooks**  
+  - Exploration of data, model architecture, training, and evaluation routines.
 
 ---
 
