@@ -95,8 +95,8 @@ python scripts/evaluate.py \
 - **Refine NNME Loss**  
   Investigate advanced metrics for point uniformity or coverage. Try weighting schemes or multi-scale nearest neighbors.
 - **Integrate Additional Losses**  
-  Explore other 3D losses (e.g., normal consistency or segmentation-based constraints) if relevant.
-- **Benchmark on More Datasets**  
-  Validate on additional point-cloud datasets (e.g., ShapeNet or agricultural data) to confirm generalization.
+  Explore other 3D losses (e.g., EMD loss) if relevant.
+- **Benchmark on Baseline Datasets**  
+  Validate on other point-cloud datasets (e.g., ShapeNet or agricultural data) to confirm generalization.
 - **Improve Logging/Visualization**  
   Enhance real-time monitoring, add 3D shape visualizations, or integrate with TensorBoard to compare models.
