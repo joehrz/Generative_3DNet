@@ -1,7 +1,7 @@
 # Generative 3DWheatNet (BI-Net)
 > **Note**: This project is still a **work in progress**.
 
-This is an implementation of the BI-Net paper:  
+This is an implementation of the BI-Net paper for educational purposes:  
 [**3D Point Cloud Shape Generation with Collaborative Learning of Generative Adversarial Network and Auto-Encoder**](https://www.mdpi.com/2072-4292/16/10/1772)
 
 **BI-Net** (Bidirectional Network) is a **collaborative** Auto-Encoder (AE) and Generative Adversarial Network (GAN) for **3D point-cloud** data. Using **TreeGCN** expansions, BI-Net can **reconstruct** real point clouds in one direction and **generate** new shapes in the other direction. This approach is particularly suited to **limited 3D datasets** (e.g., wheat plants), leveraging an AE to guide the GAN’s discriminator and generator.
