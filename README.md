@@ -55,7 +55,7 @@ The folder `data/processed/` (or `data/preprocessed`) will store generated .npz 
 
 To downsample, unify point counts, and normalize:
 ```bash
-python src/main.py --preprocess \
+python main.py --preprocess \
     --input_dir data/raw \
     --output_dir data/processed \
     --voxel_size 0.02 \
@@ -67,7 +67,7 @@ python src/main.py --preprocess \
 
 Once you have preprocessed .npz files in `data/processed`, you can train BI-Net:
 ```bash
-python src/main.py --train \
+python main.py --train \
     --data_dir data/processed \
     --batch_size 8 \
     --epochs 10 \
