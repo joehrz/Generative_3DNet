@@ -1,43 +1,61 @@
 # Generative 3DWheatNet (BI-Net)
-> **Note**: This project is still a **work in progress**.
 
-This is an implementation of the BI-Net paper for educational purposes:  
+> **Note**: This project is a **work in progress**.
+
+This repository provides an educational implementation of **BI-Net**, inspired by the paper:  
 [**3D Point Cloud Shape Generation with Collaborative Learning of Generative Adversarial Network and Auto-Encoder**](https://www.mdpi.com/2072-4292/16/10/1772)
 
-**BI-Net** (Bidirectional Network) is a **collaborative** Auto-Encoder (AE) and Generative Adversarial Network (GAN) for **3D point-cloud** data. Using **TreeGCN** expansions, BI-Net can **reconstruct** real point clouds in one direction and **generate** new shapes in the other direction. 
+**BI-Net** merges an **autoencoder** (AE) and a **WGAN-GP** into a single framework to generate 3D point clouds. The network includes:
+- An **encoder-decoder** for reconstruction (using EMD/Chamfer loss).
+- A **discriminator** to improve realism of synthetic shapes.
+- A **uniformity loss** (NNME) that encourages evenly distributed points.
+
+## Table of Contents
+1. [Overview](#overview)
+2. [Features](#features)
+3. [Installation](#installation)
+4. [Usage](#usage)
+   - [Data Preprocessing](#data-preprocessing)
+   - [Training](#training)
+   - [Evaluation](#evaluation)
+   - [Generation](#generation)
+5. [Configuration](#configuration)
+6. [Intermediate Results](#intermediate-results)
+7. [Future Improvements](#future-improvements)
+
+---
+
+## Overview
+
+**BI-Net** aims to generate high-quality 3D point clouds while preserving fine structural details. The model has two main components:
+
+- **Autoencoder**:  
+  \- Encodes an input point cloud \( N \times 3 \) to a latent code and reconstructs it, typically measured via EMD or Chamfer.  
+- **WGAN-GP**:  
+  \- A generator produces synthetic point clouds from random latent vectors, while the discriminator distinguishes between real and generated clouds. We employ **gradient penalty** for stable training.  
+  \- An additional **NNME** loss helps ensure uniform point coverage.  
+
+Optionally, **warm-up epochs** let the AE converge somewhat before enabling adversarial steps.
 
 ---
 
 ## Features
 
-- **Forward (AE) Direction**  
-  - Encodes real point clouds into a latent code and reconstructs them via a TreeGCN-based decoder.
-  - Supports Chamfer / EMD loss for high-fidelity reconstruction.
-
-- **Reverse (GAN) Direction**  
-  - Generates point clouds from random noise, using the shared “En–Di” module as a discriminator.
-  - Implements Wasserstein GAN with Gradient Penalty (WGAN-GP) for stable training.
-  - Optional **NNME** (Nearest Neighbor Mutual Exclusion) loss encourages uniform point distributions.
-
-- **TreeGCN Expansion**  
-  - Hierarchical branching from a small latent code to a large 3D point set.
-  - Flexible degrees / layers to adapt shape complexity.
-
-- **Data Preprocessing**  
-  - Voxel-based downsampling, farthest point sampling, and normalization to a unit sphere.
-
-- **Multiple Notebooks**  
-  - Exploration of data, model architectures, training procedures, and evaluation.
+- **Combined AE + WGAN** for 3D generation
+- **Gradient Penalty (WGAN-GP)** for better training stability
+- **NNME Loss** to encourage uniform point distribution
+- **Warm-up** support to train AE first (if configured)
+- **Open3D** used for point cloud visualization and `.ply` export
+- **TensorBoard** logging (AE_loss, D_loss, G_loss, etc.)
 
 ---
 
-## Installation & Setup
+## Installation
 
-1. **Clone the Repository**:
+1. **Clone this repository**:
    ```bash
-   git clone https://github.com/YourUsername/Generative_3DWheatNet.git
+   git clone https://github.com/joehrz/Generative_3DWheatNet.git
    cd Generative_3DWheatNet
-   ```
 
 2. **Build Instructions**:
    ```bash
@@ -79,8 +97,26 @@ Adjust parameters (batch size, epochs, GPU device, etc.) as needed. You can also
 ```bash
 python scripts/evaluate.py \
     --model_checkpoint bi_net_checkpoint.pth \
-    --batch_size 8 \
-    --latent_dim 96 \
+    --batch_size 16 \
+    --latent_dim 128 \
+    --data_root data/processed \
+    --split test
+```
+
+**Intermediate Results**
+
+Below are some **non-final** yet promising outcomes demonstrating the model’s steady improvement:
+
+1. **Shapenet Chairs Epoch Progression**  
+   ![Shapenet Chairs Epoch Progression](docs/images/plantandnonplantsegmentation.png)
+
+The above illustrates generated chair point clouds evolving over training, gradually improving structure and uniformity.
+
+```bash
+python scripts/evaluate.py \
+    --model_checkpoint bi_net_checkpoint.pth \
+    --batch_size 16 \
+    --latent_dim 128 \
     --data_root data/processed \
     --split test
 ```
