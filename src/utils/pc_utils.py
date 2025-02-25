@@ -101,18 +101,3 @@ def sample_points(pc, num_samples=1024):
         repeated = pc[torch.randint(0, N, (extra,))]
         return torch.cat([pc, repeated], dim=0)
 
-def compute_chamfer_distance(pc1, pc2):
-    """
-    Naive O(N*M) Chamfer distance for demonstration.
-    If you want a real optimized version, use e.g. 'pytorch3d.loss.chamfer_distance'.
-    """
-    B, N, _ = pc1.size()
-    M = pc2.size(1)
-    pc1_expand = pc1.unsqueeze(2).expand(B, N, M, 3)
-    pc2_expand = pc2.unsqueeze(1).expand(B, N, M, 3)
-    dist = torch.norm(pc1_expand - pc2_expand, dim=3)  # [B, N, M]
-
-    min_dist_pc1, _ = torch.min(dist, dim=2)  # [B, N]
-    min_dist_pc2, _ = torch.min(dist, dim=1)  # [B, M]
-    loss = torch.mean(min_dist_pc1) + torch.mean(min_dist_pc2)
-    return loss
