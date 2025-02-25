@@ -1,4 +1,4 @@
-# File: src/training/train_utils.py
+# File: src/utils/train_utils.py
 
 import torch
 import os
@@ -6,11 +6,11 @@ import open3d as o3d
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 
-# Import your BiNet
+# Import your model
 from src.models.bi_net import BiNet
-# Import your losses or supporting functions
+# Import losses and supporting functions
 from src.utils.losses import gradient_penalty, nnme_loss
-from src.utils.emd.emd_module import emdModule  # or from .losses import ...
+from src.utils.emd.emd_module import emdModule  
 import math
 
 def compute_gradient_norm(model):
