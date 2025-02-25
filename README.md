@@ -9,20 +9,6 @@ This repository provides an educational implementation of **BI-Net**, inspired b
 - An **encoder-decoder** for reconstruction (using EMD/Chamfer loss).
 - A **discriminator** to improve realism of synthetic shapes.
 - A **uniformity loss** (NNME) that encourages evenly distributed points.
-
-## Table of Contents
-1. [Overview](#overview)
-2. [Features](#features)
-3. [Installation](#installation)
-4. [Usage](#usage)
-   - [Data Preprocessing](#data-preprocessing)
-   - [Training](#training)
-   - [Evaluation](#evaluation)
-   - [Generation](#generation)
-5. [Configuration](#configuration)
-6. [Intermediate Results](#intermediate-results)
-7. [Future Improvements](#future-improvements)
-
 ---
 
 ## Overview
@@ -61,6 +47,18 @@ Optionally, **warm-up epochs** let the AE converge somewhat before enabling adve
    ```bash
    pip install -r requirements.txt
    ```
+
+## Dataset
+
+We utilize the ShapeNet dataset, a large-scale repository of 3D shapes spanning numerous object categories. This dataset is described in:
+
+> **Citation**:  
+> Chang, Angel X., et al.,
+> "ShapeNet: An Information-Rich 3D Model Repository.",  
+> arXiv:1512.03012 [cs.GR], Stanford University --- Princeton University --- Toyota Technological Institute at Chicago, 2015.
+
+## Wheat Dataset
+The wheat data is not publicly available at this time. We plan to share more information in the future.
 
 **Data Preparation**
 
