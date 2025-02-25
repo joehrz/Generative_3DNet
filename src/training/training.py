@@ -104,8 +104,6 @@ def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_gene
             lambda_gp=config.model.lambda_gp,
             lambda_nnme=config.model.lambda_nnme,
             logger=logger,
-            # you can do val_interval=1 so we validate every epoch
-            # or val_interval=2, etc.
             val_interval=1,    
             emd_eps=0.002,
             emd_iters=50  
@@ -136,7 +134,7 @@ def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_gene
             fake_points = binet.generate(z)
         logger.info(f"[INFO] Generated shape => {fake_points.shape}  (B, N, 3)")
 
-        # You might want to save them to .npz, or do something else:
+        # Save to .npz, or do something else:
         out_gen_path = os.path.join(config.model.save_dir, "generated_points.npz")
         np.savez(out_gen_path, points=fake_points.cpu().numpy())
         logger.info(f"[INFO] Saved generated points to {out_gen_path}")
