@@ -3,6 +3,7 @@
 import os
 import torch
 import numpy as np
+import datetime
 from torch.utils.data import DataLoader
 
 from src.dataset.pc_dataset import PointCloudDataset
@@ -11,10 +12,8 @@ from src.utils.train_utils import train_binet
 from src.utils.losses import evaluate_on_loader_emd_chamfer
 
 
-#PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-#sys.path.append(PROJECT_ROOT)
 
-def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_generate=False):
+def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_generate=False, ckpt_name=None):
     """
     High-level routine that:
       1) Builds dataset loaders from config paths (train/val/test).
@@ -66,29 +65,27 @@ def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_gene
     # -----------------------------
 
     latent_dim    = config.model.latent_dim
-    batch_size    = config.training.batch_size
     features_g    = config.model.features_g
     degrees       = config.model.degrees
-    ae_enc_feat = config.model.ae_enc_feat
-    disc_hidden   = config.model.disc_hidden
     support       = config.model.support
 
     binet = BiNet(
-        batch_size=batch_size,
-        ae_enc_feat=ae_enc_feat,
         latent_dim=latent_dim,
-        disc_hidden=disc_hidden,
         features_g=features_g,
-        degrees=degrees,
+        degrees_g=degrees,
         support=support
     ).to(device)
 
     # Load checkpoint if needed
-    ckpt_path = os.path.join(config.model.save_dir, config.model.checkpoint_name)
+    ckpt_path = os.path.join(config.model.save_dir, ckpt_name)
     print(ckpt_path)
     if os.path.exists(ckpt_path):
         logger.info(f"Loading BI-Net checkpoint from {ckpt_path}")
         binet.load_state_dict(torch.load(ckpt_path, map_location=device))
+    else:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        ckpt_name = f"bi_net_{timestamp}.pth"
+        ckpt_path = os.path.join(config.model.save_dir, ckpt_name)
 
 
 
@@ -99,7 +96,7 @@ def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_gene
         logger.info(f"[INFO] Starting training for {config.training.epochs} epochs...")
         binet = train_binet(
             binet,
-            data_loader=train_loader,
+            train_loader=train_loader,
             val_loader=val_loader,   # pass val_loader here
             device=device,
             epochs=config.training.epochs,
@@ -109,7 +106,9 @@ def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_gene
             logger=logger,
             # you can do val_interval=1 so we validate every epoch
             # or val_interval=2, etc.
-            val_interval=1
+            val_interval=1,    
+            emd_eps=0.002,
+            emd_iters=50  
         )
         logger.info("[INFO] Training done. Saving checkpoint.")
         torch.save(binet.state_dict(), ckpt_path)
@@ -129,6 +128,7 @@ def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_gene
     # -----------------------------
     if do_generate:
         logger.info("[INFO] Generating random shapes from latent noise.")
+        binet.load_state_dict(torch.load(ckpt_name))
         binet.eval()
         sample_count = 4  # e.g. generate 4 shapes
         z = torch.randn(sample_count, latent_dim, device=device)
