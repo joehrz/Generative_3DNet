@@ -5,7 +5,7 @@
 This repository provides an educational implementation of **BI-Net**, inspired by the paper:  
 [**3D Point Cloud Shape Generation with Collaborative Learning of Generative Adversarial Network and Auto-Encoder**](https://www.mdpi.com/2072-4292/16/10/1772)
 
-**BI-Net** merges an **autoencoder** (AE) and a **WGAN-GP** into a single framework to generate 3D point clouds. The network includes:
+**BI-Net** merges an **autoencoder** (AE) and a **GAN** into a single framework to generate 3D point clouds. The network includes:
 - An **encoder-decoder** for reconstruction (using EMD/Chamfer loss).
 - A **discriminator** to improve realism of synthetic shapes.
 - A **uniformity loss** (NNME) that encourages evenly distributed points.
