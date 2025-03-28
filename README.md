@@ -16,7 +16,7 @@ This repository provides an educational implementation of **BI-Net**, inspired b
 **BI-Net** aims to generate high-quality 3D point clouds while preserving fine structural details. The model has two main components:
 
 - **Autoencoder**:  
-  \- Encodes an input point cloud \( N \times 3 \) to a latent code and reconstructs it, typically measured via EMD or Chamfer.  
+  \- Encodes an input point cloud to a latent code and reconstructs it, typically measured via EMD or Chamfer.  
 - **WGAN-GP**:  
   \- A generator produces synthetic point clouds from random latent vectors, while the discriminator distinguishes between real and generated clouds. We employ **gradient penalty** for stable training.  
   \- An additional **NNME** loss helps ensure uniform point coverage.  
