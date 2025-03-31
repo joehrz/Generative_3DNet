@@ -17,7 +17,7 @@ This repository provides an educational implementation of **BI-Net**, inspired b
 
 - **Autoencoder**:  
   \- Encodes an input point cloud to a latent code and reconstructs it, typically measured via EMD or Chamfer.  
-- **WGAN-GP**:  
+- **GAN**:  
   \- A generator produces synthetic point clouds from random latent vectors, while the discriminator distinguishes between real and generated clouds. We employ **gradient penalty** for stable training.  
   \- An additional **NNME** loss helps ensure uniform point coverage.  
 
@@ -27,7 +27,7 @@ Optionally, **warm-up epochs** let the AE converge somewhat before enabling adve
 
 ## Features
 
-- **Combined AE + WGAN** for 3D generation
+- **Combined AE + GAN** for 3D generation
 - **Gradient Penalty (WGAN-GP)** for better training stability
 - **NNME Loss** to encourage uniform point distribution
 - **Warm-up** support to train AE first (if configured)
