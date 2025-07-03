@@ -20,9 +20,8 @@ data:
 
   # Ratios for splitting the dataset into train and validation sets.
   # The test set ratio is automatically calculated as 1.0 - (train + val).
-  # For example, [0.8, 0.1] results in 80% train, 10% val, 10% test.
-  # Your original [0.7, 0.15, 0.15] is also valid if the splitting script is adapted.
-  split_ratios: [0.8, 0.1]
+  # [0.7, 0.15, 0.15] is also valid if the splitting script is adapted.
+split_ratios: [0.8, 0.1, 0.1]
 
   # Final subdirectories used by the DataLoader.
   splits:
@@ -81,7 +80,7 @@ training:
   # Compute device: 'cuda' or 'cpu'
   device: "cuda"
   # Number of training epochs
-  epochs: 2000
+  epochs: 10
   # Batch size for training and evaluation
   batch_size: 12
   # Number of epochs to train only the autoencoder before starting GAN training
