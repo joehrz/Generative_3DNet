@@ -1,42 +1,139 @@
+# ===================================================================
+# ==         Default Configuration for BI-Net Project              ==
+# ===================================================================
+# This file centralizes all parameters for the project, making
+# experiments reproducible and easy to manage.
+
+# ==================================
+# ==        Data Settings         ==
+# ==================================
 data:
-  raw_dir: "shape_net_data/chairs_03001627"     # path to your raw chair npz data
-  processed_dir: "shape_net_data/processed"
-  splits_dir: "shape_net_data/splits"
+  # --- Active Data Paths (Sorghum Plants) ---
+  raw_dir: "data/Sorghum_Plants_Point_Cloud_Data/raw"
+  processed_dir: "data/Sorghum_Plants_Point_Cloud_Data/processed"
+  splits_dir: "data/Sorghum_Plants_Point_Cloud_Data/splits"
+  
+  # --- Commented Out Data Paths (ShapeNet Example) ---
+  # raw_dir: "shape_net_data/chairs_03001627"
+  # processed_dir: "shape_net_data/processed"
+  # splits_dir: "shape_net_data/splits"
+
+  # Ratios for splitting the dataset into train and validation sets.
+  # The test set ratio is automatically calculated as 1.0 - (train + val).
+  # For example, [0.8, 0.1] results in 80% train, 10% val, 10% test.
+  # Your original [0.7, 0.15, 0.15] is also valid if the splitting script is adapted.
+  split_ratios: [0.8, 0.1]
+
+  # Final subdirectories used by the DataLoader.
   splits:
-    train_dir: "shape_net_data/splits/train"
-    val_dir: "shape_net_data/splits/val"
-    test_dir: "shape_net_data/splits/test"
-  split_ratios: [0.7, 0.15, 0.15]
+    train_dir: "data/Sorghum_Plants_Point_Cloud_Data/splits/train"
+    val_dir: "data/Sorghum_Plants_Point_Cloud_Data/splits/val"
+    test_dir: "data/Sorghum_Plants_Point_Cloud_Data/splits/test"
+    # train_dir: "shape_net_data/splits/train"
+    # val_dir: "shape_net_data/splits/val"
+    # test_dir: "shape_net_data/splits/test"
 
+# ==================================
+# ==   Preprocessing Settings     ==
+# ==================================
 preprocessing:
-  voxel_size: 1.0         # or adjust if you want heavier downsampling; 1.0 might be large
-  num_points: 2048        # unify each shape to 2048 points
+  # Voxel size for downsampling. A larger value means more aggressive downsampling.
+  # Your comment: or adjust if you want heavier downsampling; 1.0 might be large
+  voxel_size: 0.02
+  # Target number of points for each point cloud after preprocessing.
+  # Your comment: unify each shape to 2048 points
+  num_points: 2048
+  # Use Farthest Point Sampling (FPS) for downsampling to num_points.
+  # If false, random sampling is used. FPS is slower but better preserves shape structure.
   use_fps: true
-  noise_params:
-    mean: 0.0
-    std: 0.02
+  # If true, skips the voxel_downsampling step entirely.
+  skip_downsample: false
 
+# ==================================
+# ==      Model Architecture      ==
+# ==================================
+model:
+  # Directory to save model checkpoints
+  save_dir: "models/checkpoints"
+  # Latent dimension of the autoencoder
+  latent_dim: 128
+  # Weight for the gradient penalty in WGAN-GP
+  lambda_gp: 10.0
+  # Weight for the uniformity loss (NNME) on the generator
+  lambda_nnme: 1.0 #0.1
+  # Number of neighbors for support in TreeGCN
+  support: 10
+  
+  # --- Generator Architecture (Set to what paper has) ---
+  # Feature dimensions for each layer of the TreeGCN generator
+  features_g: [128, 256, 256, 256, 128, 128, 128, 3]
+  # Branching degrees for each layer of the TreeGCN generator
+  degrees: [1, 2, 2, 2, 2, 2, 64] # Product is 2048
+  # features_g: [96, 128, 128, 64, 64, 32, 3]
+  # degrees: [2, 2, 2, 2, 2, 64]
+  # ae_enc_feat: [3, 64, 128, 256, 512]
+  # disc_hidden: [256, 128]
+
+# ==================================
+# ==      Training Settings       ==
+# ==================================
 training:
-  batch_size: 16
-  epochs: 50
-  learning_rate: 0.001
-  betas: [0.9, 0.999]
+  # Compute device: 'cuda' or 'cpu'
+  device: "cuda"
+  # Number of training epochs
+  epochs: 2000
+  # Batch size for training and evaluation
+  batch_size: 12
+  # Number of epochs to train only the autoencoder before starting GAN training
+  warmup_epochs: 10
+  
+  # --- Learning Rates & Optimizer ---
+  # The single learning_rate is applied to all optimizers for simplicity.
+  # Can also define them separately (lr_enc, lr_dec, lr_disc) if needed.
+  lr_enc: 0.0002
+  lr_dec: 0.0002
+  lr_disc: 0.0002
+  # Betas for the Adam optimizer
+  betas: [0.0, 0.999]
+  
+  # --- Optional Learning Rate Scheduler ---
+  # NOTE: To use this, must implement a scheduler (e.g., torch.optim.lr_scheduler.StepLR)
+  # in your training loop (`train_utils.py`).
   scheduler_step_size: 20
   scheduler_gamma: 0.5
+  
+  # --- GAN Training Ratios ---
+  # Number of discriminator updates per generator update
+  d_iters: 1
+  # Number of generator updates per batch
+  g_iters: 1
+  
+  # --- Loss Weights ---
+  # Weight for the reconstruction loss (EMD)
+  lambda_rec: 1.0
+  
+  # EMD calculation parameters
+  emd_eps: 0.002
+  emd_iters: 50
+  
+  # --- Logging and Validation ---
+  log_interval: 50 # Log training stats every N global steps
+  val_interval: 5  # Run validation every N epochs
+  tensorboard_mesh_log_interval: 500 # Log meshes to TensorBoard every N global steps
 
-model:
-  latent_dim: 128
-  #features_g: [96, 128, 128, 64, 64, 32, 3]
-  # IMPORTANT: set 'degrees' so the product = 2048
-  # (1 x 2 x 2 x 2 x 2 x 2 x 64 = 2048)
-  #degrees: [2, 2, 2, 2, 2, 64]
-  features_g: [128, 256, 256, 256, 128, 128, 128, 3]
-  degrees: [1, 2, 2, 2, 2, 2, 64]
-  support: 10
-  ae_enc_feat:  [3, 64, 128, 256, 512]
-  disc_hidden: [256, 128]
-  lambda_gp: 10.0
-  lambda_nnme: 0.05
-  final_num_points: 2048  # just a reference if your code checks it
-  save_dir: "models/checkpoints"
-  checkpoint_name: "bi_net_checkpoint.pth"
+  # --- Data Augmentation Flags ---
+  augment_rotate: True
+  augment_flip: True
+  augment_scale: True
+  augment_min_scale: 0.9
+  augment_max_scale: 1.1
+  augment_noise_std: 0.005 # Standard deviation for Gaussian noise. 0 to disable.
+  augment_jitter_sigma: 0.01 # Sigma for per-point jitter. 0 to disable.
+  augment_jitter_clip: 0.02
+
+# ==================================
+# ==    Generation Settings       ==
+# ==================================
+generation:
+  # Number of shapes to generate when running with --generate
+  sample_count: 8
