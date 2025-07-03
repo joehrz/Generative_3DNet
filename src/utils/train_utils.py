@@ -7,7 +7,7 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 import math
 
-# Import your model
+# Import the binet model
 from src.models.bi_net import BiNet
 # Import losses and supporting functions
 from src.utils.losses import gradient_penalty, nnme_loss
