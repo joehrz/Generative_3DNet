@@ -41,8 +41,6 @@ import os
 import sys
 import argparse
 
-# This robustly sets the project root, assuming main.py is in a 'scripts'
-# or 'src' subdirectory, or even at the top level.
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
@@ -134,7 +132,7 @@ def main():
                 voxel_size=config.preprocessing.voxel_size,
                 num_points=config.preprocessing.num_points,
                 use_fps=config.preprocessing.use_fps,
-                skip_downsample=config.preprocessing.get('skip_downsample', False)
+                skip_downsample=config.preprocessing.skip_downsample
             )
             logger.info("Preprocessing completed successfully.")
         except Exception as e:
