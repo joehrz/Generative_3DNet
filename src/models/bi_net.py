@@ -5,10 +5,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
-
 # =======================================================
-# == 3. Shared Encoder/Discriminator Architecture =======
+# == Shared Encoder/Discriminator Architecture =======
 # =======================================================
 class EncoderDiscriminatorBackbone(nn.Module):
     """
@@ -33,7 +31,6 @@ class EncoderDiscriminatorBackbone(nn.Module):
         self.conv5 = nn.Conv1d(512, 1024, kernel_size=1, stride=1, bias=True)
         
         # 2) For the final pooled feature => we have a 3-FC "head"
-        # We'll build them so we can route them differently for encoder or discriminator
         # Shared layers for encoder:
         self.enc_fc1 = nn.Linear(1024, 512)
         self.enc_fc2 = nn.Linear(512, 256)
@@ -82,7 +79,6 @@ class EncoderDiscriminatorBackbone(nn.Module):
         else:
             raise ValueError("Invalid mode. Must be 'encoder' or 'discriminator'.")
 
-
 # =======================================================
 # ==========   4. TreeGCN Generator/Decoder   ===========
 # =======================================================
@@ -90,13 +86,6 @@ class TreeGCNLayer(nn.Module):
     """
     One TreeGCN layer that upsamples from 'old_num' nodes -> 'old_num * degree' nodes
     or simply transforms them if degree=1. 
-    We'll replicate the structure from the user snippet & from the TreeGAN approach.
-
-    Steps:
-      1) Root transform: linear(in_feat -> out_feat)
-      2) Branch transform if upsample: 
-         linear(in_feat -> in_feat * degree) => reshape => pass "support" => out_feat
-      3) Sum root + branch, add bias, apply LeakyReLU
     """
     def __init__(self, in_feat, out_feat, degree, support=10, upsample=True, activation=True):
         super().__init__()
@@ -107,104 +96,64 @@ class TreeGCNLayer(nn.Module):
         self.activation  = activation
         self.leaky_relu  = nn.LeakyReLU(0.2, inplace=True)
         
-        # Root transform:
         self.W_root = nn.Linear(in_feat, out_feat, bias=False)
 
-        # Branch transform if upsample
         if self.upsample and degree > 1:
             self.W_branch = nn.Linear(in_feat, in_feat * degree, bias=False)
         
-        # "Loop" transform (like a small MLP)
         self.W_loop = nn.Sequential(
             nn.Linear(in_feat, in_feat * support, bias=False),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(in_feat * support, out_feat, bias=False)
         )
 
-        # bias for combination
         self.bias = nn.Parameter(torch.FloatTensor(1, out_feat))
-        # The original snippet had shape (1, degree, out_feat), but we can broadcast
         nn.init.uniform_(self.bias, -1.0/math.sqrt(out_feat), 1.0/math.sqrt(out_feat))
 
     def forward(self, x):
-        """
-        x: shape (B, old_num, in_feat)
-        Returns: shape (B, new_num, out_feat) 
-                 new_num = old_num * degree if upsample, else old_num
-        """
         B, old_num, in_feat = x.shape
-
-        # Root transform
-        root = self.W_root(x.view(-1, in_feat))        # (B*old_num, out_feat)
-        root = root.view(B, old_num, self.out_feat)    # (B, old_num, out_feat)
-
-        # "Loop" transform on x
-        loop = self.W_loop(x)  # shape (B, old_num, out_feat)
+        root = self.W_root(x.view(-1, in_feat)).view(B, old_num, self.out_feat)
+        loop = self.W_loop(x)
 
         if self.upsample and self.degree > 1:
-            # Branch transform => upsample
-            branch = self.W_branch(x)  # (B, old_num, in_feat*degree)
-            branch = branch.view(B, old_num * self.degree, in_feat)
-            branch = self.W_loop(branch)  # => (B, old_num*degree, out_feat)
+            branch = self.W_branch(x).view(B, old_num * self.degree, in_feat)
+            branch = self.W_loop(branch)
             
-            # Repeat the root features to match upsample dimension 
-            # (since root has shape (B, old_num, out_feat))
-            # we replicate it 'degree' times across node dimension
             root = root.unsqueeze(2).expand(B, old_num, self.degree, self.out_feat)
-            root = root.contiguous().view(B, old_num*self.degree, self.out_feat) 
+            root = root.contiguous().view(B, old_num * self.degree, self.out_feat) 
 
             combined = root + branch
         else:
-            # No upsample
             combined = root + loop
         
-        out = combined + self.bias  # (B, new_num, out_feat), broadcast bias
+        out = combined + self.bias
         if self.activation:
             out = self.leaky_relu(out)
         
         return out
 
-
 class TreeGCNGenerator(nn.Module):
     """
-    7-layer TreeGCN that expands a (B,1,128) latent to (B,2048,3).
-    We'll replicate the structure from the snippet: 
-      features = [128,256,256,256,128,128,128,3]
-      degrees  = [1, 2, 2, 2, 2, 2, 64]  (this multiplies up to 2048)
-      support  = 10
+    7-layer TreeGCN that expands a latent vector to a point cloud.
     """
     def __init__(self, features, degrees, support=10):
         super().__init__()
-        self.layer_num = len(features) - 1  # 7 layers if len(features)=8
+        self.layer_num = len(features) - 1
         self.layers = nn.ModuleList()
 
-        # Build each layer
         for i in range(self.layer_num):
             in_feat  = features[i]
             out_feat = features[i+1]
-            degree   = degrees[i]  # index offset if first is 1
-            upsample = (degree > 1)  # if degree=1 => no upsample
-            activation = (i != self.layer_num-1)  # last layer => no activation
-            layer = TreeGCNLayer(
-                in_feat  = in_feat,
-                out_feat = out_feat,
-                degree   = degree,
-                support  = support,
-                upsample = upsample,
-                activation = activation
-            )
-            self.layers.append(layer)
+            degree   = degrees[i]
+            upsample = (degree > 1)
+            activation = (i != self.layer_num-1)
+            self.layers.append(TreeGCNLayer(in_feat, out_feat, degree, support, upsample, activation))
 
     def forward(self, z):
-        """
-        z: shape (B, 1, 128)  (the root node of the tree)
-        returns: shape (B, 2048, 3) final points
-        """
         x = z
         for layer in self.layers:
             x = layer(x)
-        return x  # (B, final_num_points, 3)
-
+        return x
 
 # =======================================================
 # ============   5. Full BI-Net Implementation  =========
@@ -220,55 +169,54 @@ class BiNet(nn.Module):
     def __init__(
         self,
         latent_dim=128,
-        # for TreeGCN:
         features_g = [128, 256, 256, 256, 128, 128, 128, 3],
         degrees_g  = [1,   1,   2,   2,   2,   2,   2,  64],
         support    = 10
     ):
         super().__init__()
-        # Shared backbone for encoder/discriminator
         self.backbone = EncoderDiscriminatorBackbone(latent_dim=latent_dim)
-
-        # TreeGCN generator (used as AE decoder & GAN generator)
-        self.generator = TreeGCNGenerator(
-            features = features_g,
-            degrees  = degrees_g,
-            support  = support
-        )
-
+        self.generator = TreeGCNGenerator(features=features_g, degrees=degrees_g, support=support)
         self.latent_dim = latent_dim
     
-    # ----------- AE direction -----------
     def encode(self, real_points):
-        """
-        real_points: (B, N, 3)
-        returns: (B, latent_dim)
-        """
         return self.backbone(real_points, mode='encoder')
     
     def decode(self, latent_code):
-        """
-        latent_code: (B, latent_dim)
-        => unsqueeze => (B,1,latent_dim) => pass to TreeGCN => (B, 2048, 3)
-        """
         if latent_code.dim() == 2:
-            latent_code = latent_code.unsqueeze(1)  # (B,1,latent_dim)
+            latent_code = latent_code.unsqueeze(1)
         return self.generator(latent_code)
 
-    # ----------- GAN direction -----------
     def generate(self, noise):
-        """
-        noise: (B, latent_dim)
-        => unsqueeze => (B,1,latent_dim) => pass generator => (B, 2048, 3)
-        """
         if noise.dim() == 2:
             noise = noise.unsqueeze(1)
         return self.generator(noise)
     
     def discriminate(self, points):
-        """
-        points: (B, N, 3)
-        returns: (B,1) score
-        """
         return self.backbone(points, mode='discriminator')
+
+    def get_encoder_params(self):
+        """Returns parameters for the encoder path."""
+        enc_params = []
+        shared_params = []
+        for name, p in self.backbone.named_parameters():
+            if "enc_fc" in name:
+                enc_params.append(p)
+            elif "disc_fc" not in name:
+                shared_params.append(p)
+        return enc_params, shared_params
+
+    def get_generator_params(self):
+        """Returns parameters of the TreeGCN generator."""
+        return list(self.generator.parameters())
+
+    def get_discriminator_params(self):
+        """Returns parameters for the discriminator path."""
+        disc_params = []
+        shared_params = []
+        for name, p in self.backbone.named_parameters():
+            if "disc_fc" in name:
+                disc_params.append(p)
+            elif "enc_fc" not in name:
+                shared_params.append(p)
+        return disc_params, shared_params
         
