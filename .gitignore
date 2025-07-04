@@ -27,6 +27,8 @@ images
 *.png
 *.jpg
 
+# data files
+
 # Ignore env file
 .env
 
@@ -53,3 +55,4 @@ runs
 
 # Model
 .pth
+models/checkpoints
