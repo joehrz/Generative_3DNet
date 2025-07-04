@@ -4,7 +4,6 @@ import os
 import torch
 import numpy as np
 from torch.utils.data import Dataset
-
 class PointCloudDataset(Dataset):
     """
     A dataset class for point-cloud data (optionally with RGB).
@@ -15,76 +14,64 @@ class PointCloudDataset(Dataset):
     - Typically expects arrays of shape (N, 3) for XYZ or (N, 6) for XYZ+RGB.
     - If using .npz, it looks for a 'points' key by default (or else defaults to the
       first array found in the file).
-    - An optional transform can be applied to the loaded NumPy array before
-      it is converted to a PyTorch tensor.
+    - An optional transform can be applied to the loaded data. It is applied after
+      the data is converted to a PyTorch tensor.
     """
 
     def __init__(self, root='data/processed', transform=None):
         """
         Args:
             root (str): Directory containing the data files (e.g. 'data/processed/').
-            transform (callable, optional): A function that takes a NumPy array
-                                            and returns a modified NumPy array
-                                            (could be augmentations, scaling, etc.).
+            transform (callable, optional): A function that takes a PyTorch tensor
+                                            and returns a modified tensor.
         """
         super().__init__()
         self.root = root
         self.transform = transform
 
-        # Check that the directory exists
         if not os.path.isdir(self.root):
             raise ValueError(f"Provided root directory does not exist: {self.root}")
 
-        # Gather valid files
         self.files = sorted(
             f
             for f in os.listdir(self.root)
-            if f.endswith('.npy') or f.endswith('.npz')
-               or f.endswith('.pt')  or f.endswith('.txt')
+            if f.endswith(('.npy', '.npz', '.pt', '.txt'))
         )
 
-        if len(self.files) == 0:
+        if not self.files:
             raise ValueError(f"No valid point-cloud files found in directory: {self.root}")
 
     def __len__(self):
         return len(self.files)
 
     def __getitem__(self, idx):
-        # Build the full path to the file
-        file_name = self.files[idx]
-        file_path = os.path.join(self.root, file_name)
+        file_path = os.path.join(self.root, self.files[idx])
+        pc_np = None
 
-        # Load the file into a NumPy array
-        if file_path.endswith('.npy'):
-            pc = np.load(file_path)
-        elif file_path.endswith('.npz'):
-            data = np.load(file_path)
-            # If there's a 'points' key, use it; otherwise fall back to the first array
-            if 'points' in data:
-                pc = data['points']
+        try:
+            if file_path.endswith('.npy'):
+                pc_np = np.load(file_path)
+            elif file_path.endswith('.npz'):
+                data = np.load(file_path)
+                if 'points' in data:
+                    pc_np = data['points']
+                else:
+                    pc_np = data[list(data.keys())[0]]
+            elif file_path.endswith('.pt'):
+                tensor_data = torch.load(file_path)
+                pc_np = tensor_data.cpu().numpy() if isinstance(tensor_data, torch.Tensor) else np.array(tensor_data)
+            elif file_path.endswith('.txt'):
+                pc_np = np.loadtxt(file_path)
             else:
-                arr_keys = list(data.keys())
-                if len(arr_keys) == 0:
-                    raise ValueError(f"No arrays found in {file_path}")
-                pc = data[arr_keys[0]]
-        elif file_path.endswith('.pt'):
-            # If .pt stored a Torch tensor or a NumPy-like structure
-            tensor_data = torch.load(file_path)
-            if isinstance(tensor_data, torch.Tensor):
-                pc = tensor_data.cpu().numpy()
-            else:
-                pc = np.array(tensor_data, dtype=np.float32)
-        elif file_path.endswith('.txt'):
-            pc = np.loadtxt(file_path)
-        else:
-            raise ValueError(f"Unsupported file format: {file_path}")
+                raise ValueError(f"Unsupported file format: {file_path}")
 
-        # Convert to float32 array
-        pc = pc.astype(np.float32)
+            pc_tensor = torch.from_numpy(pc_np.astype(np.float32))
 
-        # Apply optional transform/augmentation
-        if self.transform is not None:
-            pc = self.transform(pc)
+            if self.transform:
+                pc_tensor = self.transform(pc_tensor)
 
-        # Convert to torch.Tensor
-        return torch.from_numpy(pc)
+            return pc_tensor
+
+        except Exception as e:
+            print(f"Error loading file {file_path}: {e}")
+            raise e
