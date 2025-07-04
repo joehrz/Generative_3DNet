@@ -2,7 +2,6 @@
 
 import torch
 import torch.nn.functional as F
-from scipy.optimize import linear_sum_assignment  # (can be removed if no longer used)
 from src.utils.emd.emd_module import emdModule
 
 def chamfer_distance(pc1, pc2):
@@ -19,29 +18,6 @@ def chamfer_distance(pc1, pc2):
 
     loss = torch.mean(min_dist_pc1) + torch.mean(min_dist_pc2)
     return loss
-
-# Optionally, older emd_loss function based on the Hungarian algorithm:
-def emd_loss(pc1, pc2):
-    """
-    Compute the Earth Mover's Distance (EMD) between two point clouds
-    pc1 and pc2 of shape [B, N, D].
-    Uses SciPy's linear_sum_assignment for each batch sample.
-    Returns a scalar tensor (float) with the average EMD over the batch.
-    """
-    assert pc1.dim() == 3 and pc2.dim() == 3, "Point clouds must be [B, N, D]"
-    B, N, D = pc1.shape
-    emd_total = 0.0
-
-    for b in range(B):
-        dist_matrix = torch.cdist(pc1[b].unsqueeze(0), pc2[b].unsqueeze(0), p=2)[0] ** 2
-        cost_matrix = dist_matrix.detach().cpu().numpy()
-
-        row_idx, col_idx = linear_sum_assignment(cost_matrix)
-        emd_b = cost_matrix[row_idx, col_idx].sum() / N
-        emd_total += emd_b
-
-    emd_avg = emd_total / B
-    return torch.tensor(emd_avg, dtype=torch.float32, device=pc1.device)
 
 def evaluate_on_loader_emd_chamfer(model, data_loader, device, emd_eps=0.002, emd_iters=50):
     """
@@ -78,6 +54,7 @@ def evaluate_on_loader_emd_chamfer(model, data_loader, device, emd_eps=0.002, em
 
     avg_emd = total_emd / max(count, 1)
     avg_chamfer = total_chamfer / max(count, 1)
+    model.train() # Set model back to train mode
     return avg_emd, avg_chamfer
 
 def gradient_penalty(discriminator, real_points, fake_points, device='cuda'):
@@ -107,7 +84,7 @@ def gradient_penalty(discriminator, real_points, fake_points, device='cuda'):
     alpha = torch.rand(real_points.size(0), 1, 1, device=device)
     alpha = alpha.expand_as(real_points)
     interpolates = alpha * real_points + (1 - alpha) * fake_points
-    interpolates.requires_grad_(True)
+    interpolates.requires_grad(True)
 
     disc_interpolates = discriminator(interpolates)
     grad_outputs = torch.ones_like(disc_interpolates)
@@ -123,6 +100,7 @@ def gradient_penalty(discriminator, real_points, fake_points, device='cuda'):
     grads = grads.contiguous().view(grads.size(0), -1)
     gp = ((grads.norm(2, dim=1) - 1) ** 2).mean()
     return gp
+
 
 def nnme_loss(point_clouds, sample_fraction=0.1):
     """
