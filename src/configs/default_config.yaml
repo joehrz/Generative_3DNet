@@ -18,10 +18,9 @@ data:
   # processed_dir: "shape_net_data/processed"
   # splits_dir: "shape_net_data/splits"
 
-  # Ratios for splitting the dataset into train and validation sets.
-  # The test set ratio is automatically calculated as 1.0 - (train + val).
-  # [0.7, 0.15, 0.15] is also valid if the splitting script is adapted.
-split_ratios: [0.8, 0.1, 0.1]
+  # Ratios for splitting the dataset into train, validation, and test sets.
+  # This MUST sum to 1.0.
+  split_ratios: [0.8, 0.1, 0.1]
 
   # Final subdirectories used by the DataLoader.
   splits:
@@ -37,13 +36,10 @@ split_ratios: [0.8, 0.1, 0.1]
 # ==================================
 preprocessing:
   # Voxel size for downsampling. A larger value means more aggressive downsampling.
-  # Your comment: or adjust if you want heavier downsampling; 1.0 might be large
   voxel_size: 0.02
   # Target number of points for each point cloud after preprocessing.
-  # Your comment: unify each shape to 2048 points
   num_points: 2048
   # Use Farthest Point Sampling (FPS) for downsampling to num_points.
-  # If false, random sampling is used. FPS is slower but better preserves shape structure.
   use_fps: true
   # If true, skips the voxel_downsampling step entirely.
   skip_downsample: false
@@ -64,14 +60,8 @@ model:
   support: 10
   
   # --- Generator Architecture (Set to what paper has) ---
-  # Feature dimensions for each layer of the TreeGCN generator
   features_g: [128, 256, 256, 256, 128, 128, 128, 3]
-  # Branching degrees for each layer of the TreeGCN generator
   degrees: [1, 2, 2, 2, 2, 2, 64] # Product is 2048
-  # features_g: [96, 128, 128, 64, 64, 32, 3]
-  # degrees: [2, 2, 2, 2, 2, 64]
-  # ae_enc_feat: [3, 64, 128, 256, 512]
-  # disc_hidden: [256, 128]
 
 # ==================================
 # ==      Training Settings       ==
@@ -87,28 +77,20 @@ training:
   warmup_epochs: 10
   
   # --- Learning Rates & Optimizer ---
-  # The single learning_rate is applied to all optimizers for simplicity.
-  # Can also define them separately (lr_enc, lr_dec, lr_disc) if needed.
   lr_enc: 0.0002
   lr_dec: 0.0002
   lr_disc: 0.0002
-  # Betas for the Adam optimizer
   betas: [0.0, 0.999]
   
   # --- Optional Learning Rate Scheduler ---
-  # NOTE: To use this, must implement a scheduler (e.g., torch.optim.lr_scheduler.StepLR)
-  # in your training loop (`train_utils.py`).
   scheduler_step_size: 20
   scheduler_gamma: 0.5
   
   # --- GAN Training Ratios ---
-  # Number of discriminator updates per generator update
   d_iters: 1
-  # Number of generator updates per batch
   g_iters: 1
   
   # --- Loss Weights ---
-  # Weight for the reconstruction loss (EMD)
   lambda_rec: 1.0
   
   # EMD calculation parameters
@@ -116,9 +98,9 @@ training:
   emd_iters: 50
   
   # --- Logging and Validation ---
-  log_interval: 50 # Log training stats every N global steps
-  val_interval: 5  # Run validation every N epochs
-  tensorboard_mesh_log_interval: 500 # Log meshes to TensorBoard every N global steps
+  log_interval: 50
+  val_interval: 5
+  tensorboard_mesh_log_interval: 500
 
   # --- Data Augmentation Flags ---
   augment_rotate: True
@@ -126,13 +108,13 @@ training:
   augment_scale: True
   augment_min_scale: 0.9
   augment_max_scale: 1.1
-  augment_noise_std: 0.005 # Standard deviation for Gaussian noise. 0 to disable.
-  augment_jitter_sigma: 0.01 # Sigma for per-point jitter. 0 to disable.
+  augment_noise_std: 0.005
+  augment_jitter_sigma: 0.01
   augment_jitter_clip: 0.02
 
 # ==================================
 # ==    Generation Settings       ==
 # ==================================
-generation:
+
   # Number of shapes to generate when running with --generate
   sample_count: 8
