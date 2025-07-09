@@ -69,18 +69,40 @@ model:
 training:
   # Compute device: 'cuda' or 'cpu'
   device: "cuda"
-  # Number of training epochs
-  epochs: 10
+  # Number of training epochs (increased for small dataset training)
+  epochs: 100
   # Batch size for training and evaluation
   batch_size: 12
   # Number of epochs to train only the autoencoder before starting GAN training
-  warmup_epochs: 10
+  warmup_epochs: 20
+  
+  # --- Small Dataset Training Enhancements ---
+  # Enable progressive training phases
+  progressive_training: True
+  # Phases for progressive training (epochs per phase)
+  progressive_phases: [30, 30, 40]  # Total: 100 epochs
+  # Learning rate scheduling
+  use_cosine_annealing: True
+  cosine_annealing_T_max: 100
+  cosine_annealing_eta_min: 0.00001
   
   # --- Learning Rates & Optimizer ---
   lr_enc: 0.0002
   lr_dec: 0.0002
   lr_disc: 0.0002
   betas: [0.0, 0.999]
+  
+  # --- Regularization for Small Dataset Training ---
+  weight_decay: 0.0001
+  dropout_rate: 0.1
+  use_spectral_norm: True
+  gradient_clip_norm: 1.0
+  
+  # --- Cross-Validation for Small Datasets ---
+  use_cross_validation: False  # Set to True to enable k-fold CV
+  cv_folds: 5
+  cv_random_state: 42
+  ensemble_predictions: True
   
   # --- Optional Learning Rate Scheduler ---
   scheduler_step_size: 20
@@ -111,6 +133,21 @@ training:
   augment_noise_std: 0.005
   augment_jitter_sigma: 0.01
   augment_jitter_clip: 0.02
+  
+  # --- Advanced Augmentations ---
+  augment_perspective: True
+  augment_perspective_strength: 0.1
+  augment_elastic_deformation: True
+  augment_elastic_strength: 0.05
+  augment_elastic_control_points: 4
+  augment_occlusion: True
+  augment_occlusion_ratio: 0.1
+  augment_dropout: True
+  augment_dropout_ratio: 0.05
+  augment_rotate_3d: True
+  augment_rotate_3d_max_angle: 0.3
+  augment_point_resampling: True
+  augment_resampling_ratio: 0.1
 
 # ==================================
 # ==    Generation Settings       ==
