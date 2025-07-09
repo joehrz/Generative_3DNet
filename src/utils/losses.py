@@ -139,8 +139,9 @@ def nnme_loss(point_clouds, sample_fraction=0.1, eps=1e-8):
         # Use torch.cdist for efficient distance computation
         dist_matrix = torch.cdist(sub_shape, sub_shape, p=2)  # (subset_size, subset_size)
         
-        # Set diagonal to infinity to exclude self-distances
-        dist_matrix.fill_diagonal_(float('inf'))
+        # Create a mask to exclude self-distances without in-place modification
+        mask = torch.eye(subset_size, device=device, dtype=torch.bool)
+        dist_matrix = dist_matrix.masked_fill(mask, float('inf'))
         
         # Find minimum distances with numerical stability
         min_dists = torch.min(dist_matrix, dim=1)[0]
