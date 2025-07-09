@@ -5,17 +5,28 @@ import torch.nn.functional as F
 from src.utils.emd.emd_module import emdModule
 
 def chamfer_distance(pc1, pc2):
-    """Compute Chamfer Distance between two point clouds."""
+    """
+    Compute Chamfer Distance between two point clouds with optimized memory usage.
+    
+    Args:
+        pc1 (torch.Tensor): First point cloud of shape (B, N, 3)
+        pc2 (torch.Tensor): Second point cloud of shape (B, M, 3)
+    
+    Returns:
+        torch.Tensor: Chamfer distance loss (scalar)
+    """
     B, N, _ = pc1.size()
     M = pc2.size(1)
 
-    pc1_expand = pc1.unsqueeze(2).expand(B, N, M, 3)
-    pc2_expand = pc2.unsqueeze(1).expand(B, N, M, 3)
-    dist = torch.norm(pc1_expand - pc2_expand, dim=3)  # [B, N, M]
+    # Use torch.cdist for efficient pairwise distance computation
+    # This avoids creating large intermediate tensors
+    dist = torch.cdist(pc1, pc2, p=2)  # [B, N, M]
 
+    # Find minimum distances
     min_dist_pc1, _ = torch.min(dist, dim=2)  # [B, N]
     min_dist_pc2, _ = torch.min(dist, dim=1)  # [B, M]
 
+    # Compute mean distance for each batch and then average
     loss = torch.mean(min_dist_pc1) + torch.mean(min_dist_pc2)
     return loss
 
@@ -102,26 +113,41 @@ def gradient_penalty(discriminator, real_points, fake_points, device='cuda'):
     return gp
 
 
-def nnme_loss(point_clouds, sample_fraction=0.1):
+def nnme_loss(point_clouds, sample_fraction=0.1, eps=1e-8):
     """
     Compute a loss that encourages uniformity in the point cloud by evaluating
     the variance of the minimum pairwise distances from a random subset.
+    
+    Args:
+        point_clouds (torch.Tensor): Point clouds of shape (B, N, 3)
+        sample_fraction (float): Fraction of points to sample for efficiency
+        eps (float): Small value for numerical stability
+    
+    Returns:
+        torch.Tensor: NNME loss encouraging point uniformity
     """
     device = point_clouds.device
     B, N, _ = point_clouds.shape
-    subset_size = int(N * sample_fraction)
+    subset_size = max(int(N * sample_fraction), 2)  # Ensure at least 2 points
 
     losses = []
     for b in range(B):
         shape = point_clouds[b]
-        idx = torch.randperm(N)[:subset_size]
+        idx = torch.randperm(N, device=device)[:subset_size]
         sub_shape = shape[idx]  # (subset_size, 3)
         
+        # Use torch.cdist for efficient distance computation
         dist_matrix = torch.cdist(sub_shape, sub_shape, p=2)  # (subset_size, subset_size)
-        dist_clone = dist_matrix.clone()
-        dist_clone.fill_diagonal_(1e6)
-        min_dists = torch.min(dist_clone, dim=1)[0]
-        variance = torch.var(min_dists)
+        
+        # Set diagonal to infinity to exclude self-distances
+        dist_matrix.fill_diagonal_(float('inf'))
+        
+        # Find minimum distances with numerical stability
+        min_dists = torch.min(dist_matrix, dim=1)[0]
+        min_dists = torch.clamp(min_dists, min=eps)  # Avoid numerical instability
+        
+        # Compute variance with numerical stability
+        variance = torch.var(min_dists) + eps
         losses.append(variance)
 
     if losses:
