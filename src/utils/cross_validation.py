@@ -88,12 +88,11 @@ def k_fold_cross_validation(dataset, config, logger, k_folds=5, random_state=42)
         try:
             # Train the model
             train_binet(
-                binet=binet,
+                model=binet,
                 train_loader=train_loader,
-                val_loader=val_loader,
                 config=fold_config,
-                logger=logger,
-                save_ckpt_path=None  # Don't save individual fold checkpoints
+                val_loader=val_loader,
+                logger=logger
             )
             
             # Evaluate on validation set
