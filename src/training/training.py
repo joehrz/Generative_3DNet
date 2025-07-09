@@ -15,7 +15,9 @@ from src.dataset.pc_dataset import PointCloudDataset
 from src.models.bi_net import BiNet
 from src.utils.train_utils import train_binet
 from src.utils.losses import evaluate_on_loader_emd_chamfer
-from src.utils.pc_utils import random_rotate, random_flip, random_noise, random_scale, jitter_points, PointCloudAugmentation
+from src.utils.pc_utils import (random_rotate, random_flip, random_noise, random_scale, jitter_points, 
+                               random_perspective_transform, random_elastic_deformation, random_occlusion, 
+                               random_dropout, random_rotate_3d, random_point_resampling, PointCloudAugmentation)
 
 
 # --- Augmentation Wrapper Classes (to fix Windows multiprocessing pickling issues) ---
@@ -45,6 +47,43 @@ class JitterPointsTransform:
     def __call__(self, pc):
         return jitter_points(pc, self.sigma, self.clip)
 
+class PerspectiveTransform:
+    def __init__(self, strength=0.1):
+        self.strength = strength
+    def __call__(self, pc):
+        return random_perspective_transform(pc, self.strength)
+
+class ElasticDeformationTransform:
+    def __init__(self, strength=0.1, num_control_points=4):
+        self.strength = strength
+        self.num_control_points = num_control_points
+    def __call__(self, pc):
+        return random_elastic_deformation(pc, self.strength, self.num_control_points)
+
+class OcclusionTransform:
+    def __init__(self, occlusion_ratio=0.1):
+        self.occlusion_ratio = occlusion_ratio
+    def __call__(self, pc):
+        return random_occlusion(pc, self.occlusion_ratio)
+
+class DropoutTransform:
+    def __init__(self, dropout_ratio=0.1):
+        self.dropout_ratio = dropout_ratio
+    def __call__(self, pc):
+        return random_dropout(pc, self.dropout_ratio)
+
+class Rotate3DTransform:
+    def __init__(self, max_angle=0.5):
+        self.max_angle = max_angle
+    def __call__(self, pc):
+        return random_rotate_3d(pc, self.max_angle)
+
+class PointResamplingTransform:
+    def __init__(self, resample_ratio=0.2):
+        self.resample_ratio = resample_ratio
+    def __call__(self, pc):
+        return random_point_resampling(pc, self.resample_ratio)
+
 
 def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_generate=False, ckpt_name=None):
     """
@@ -69,6 +108,23 @@ def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_gene
         train_transforms_list.append(RandomScaleTransform(min_scale=config.training.augment_min_scale, max_scale=config.training.augment_max_scale))
     if config.training.augment_jitter_sigma > 0:
         train_transforms_list.append(JitterPointsTransform(sigma=config.training.augment_jitter_sigma, clip=config.training.augment_jitter_clip))
+    
+    # --- Advanced Augmentations ---
+    if getattr(config.training, 'augment_perspective', False):
+        train_transforms_list.append(PerspectiveTransform(strength=config.training.augment_perspective_strength))
+    if getattr(config.training, 'augment_elastic_deformation', False):
+        train_transforms_list.append(ElasticDeformationTransform(
+            strength=config.training.augment_elastic_strength,
+            num_control_points=config.training.augment_elastic_control_points
+        ))
+    if getattr(config.training, 'augment_occlusion', False):
+        train_transforms_list.append(OcclusionTransform(occlusion_ratio=config.training.augment_occlusion_ratio))
+    if getattr(config.training, 'augment_dropout', False):
+        train_transforms_list.append(DropoutTransform(dropout_ratio=config.training.augment_dropout_ratio))
+    if getattr(config.training, 'augment_rotate_3d', False):
+        train_transforms_list.append(Rotate3DTransform(max_angle=config.training.augment_rotate_3d_max_angle))
+    if getattr(config.training, 'augment_point_resampling', False):
+        train_transforms_list.append(PointResamplingTransform(resample_ratio=config.training.augment_resampling_ratio))
 
     train_transform = PointCloudAugmentation(train_transforms_list) if train_transforms_list else None
     if train_transform:
@@ -90,7 +146,9 @@ def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_gene
         latent_dim=config.model.latent_dim,
         features_g=config.model.features_g,
         degrees_g=config.model.degrees,
-        support=config.model.support
+        support=config.model.support,
+        dropout_rate=getattr(config.training, 'dropout_rate', 0.1),
+        use_spectral_norm=getattr(config.training, 'use_spectral_norm', False)
     ).to(device)
 
     save_ckpt_path = None
