@@ -4,6 +4,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.utils import spectral_norm
 
 # =======================================================
 # == Shared Encoder/Discriminator Architecture =======
@@ -21,7 +22,7 @@ class EncoderDiscriminatorBackbone(nn.Module):
       for the encoder  : 1024 -> 512 -> 256 -> 128
       for the discrim. : 1024 -> 512 -> 256 -> 1
     """
-    def __init__(self, latent_dim=128):
+    def __init__(self, latent_dim=128, dropout_rate=0.1, use_spectral_norm=False):
         super().__init__()
         # 1) 5 conv1d layers, kernel_size=1, stride=1 => pointwise transformations
         self.conv1 = nn.Conv1d(3,   64, kernel_size=1, stride=1, bias=True)
@@ -32,15 +33,32 @@ class EncoderDiscriminatorBackbone(nn.Module):
         
         # 2) For the final pooled feature => we have a 3-FC "head"
         # Shared layers for encoder:
-        self.enc_fc1 = nn.Linear(1024, 512)
-        self.enc_fc2 = nn.Linear(512, 256)
-        self.enc_fc3 = nn.Linear(256, latent_dim)
+        enc_fc1 = nn.Linear(1024, 512)
+        enc_fc2 = nn.Linear(512, 256)
+        enc_fc3 = nn.Linear(256, latent_dim)
         
         # For the discriminator:
-        self.disc_fc1 = nn.Linear(1024, 512)
-        self.disc_fc2 = nn.Linear(512, 256)
-        self.disc_fc3 = nn.Linear(256, 1)
+        disc_fc1 = nn.Linear(1024, 512)
+        disc_fc2 = nn.Linear(512, 256)
+        disc_fc3 = nn.Linear(256, 1)
         
+        # Apply spectral normalization if requested
+        if use_spectral_norm:
+            self.enc_fc1 = spectral_norm(enc_fc1)
+            self.enc_fc2 = spectral_norm(enc_fc2)
+            self.enc_fc3 = spectral_norm(enc_fc3)
+            self.disc_fc1 = spectral_norm(disc_fc1)
+            self.disc_fc2 = spectral_norm(disc_fc2)
+            self.disc_fc3 = spectral_norm(disc_fc3)
+        else:
+            self.enc_fc1 = enc_fc1
+            self.enc_fc2 = enc_fc2
+            self.enc_fc3 = enc_fc3
+            self.disc_fc1 = disc_fc1
+            self.disc_fc2 = disc_fc2
+            self.disc_fc3 = disc_fc3
+        
+        self.dropout = nn.Dropout(dropout_rate)
         self.leaky_relu = nn.LeakyReLU(negative_slope=0.2, inplace=True)
 
     def forward(self, x, mode='encoder'):
@@ -67,13 +85,17 @@ class EncoderDiscriminatorBackbone(nn.Module):
         if mode == 'encoder':
             # pass 3 FC layers => latent code
             x = self.leaky_relu(self.enc_fc1(x))   # (B, 512)
+            x = self.dropout(x)                    # Apply dropout
             x = self.leaky_relu(self.enc_fc2(x))   # (B, 256)
+            x = self.dropout(x)                    # Apply dropout
             x = self.enc_fc3(x)                    # (B, latent_dim)
             return x
         elif mode == 'discriminator':
             # pass 3 FC layers => (B, 1)
             x = self.leaky_relu(self.disc_fc1(x))  # (B, 512)
+            x = self.dropout(x)                    # Apply dropout
             x = self.leaky_relu(self.disc_fc2(x))  # (B, 256)
+            x = self.dropout(x)                    # Apply dropout
             x = self.disc_fc3(x)                   # (B, 1)
             return x
         else:
@@ -171,10 +193,16 @@ class BiNet(nn.Module):
         latent_dim=128,
         features_g = [128, 256, 256, 256, 128, 128, 128, 3],
         degrees_g  = [1,   1,   2,   2,   2,   2,   2,  64],
-        support    = 10
+        support    = 10,
+        dropout_rate=0.1,
+        use_spectral_norm=False
     ):
         super().__init__()
-        self.backbone = EncoderDiscriminatorBackbone(latent_dim=latent_dim)
+        self.backbone = EncoderDiscriminatorBackbone(
+            latent_dim=latent_dim, 
+            dropout_rate=dropout_rate, 
+            use_spectral_norm=use_spectral_norm
+        )
         self.generator = TreeGCNGenerator(features=features_g, degrees=degrees_g, support=support)
         self.latent_dim = latent_dim
     
