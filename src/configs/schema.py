@@ -183,7 +183,7 @@ class ConfigSchema:
         Raises:
             ConfigValidationError: If validation fails
         """
-        required_keys = ['batch_size', 'learning_rate', 'epochs', 'device']
+        required_keys = ['batch_size', 'epochs', 'device']
         
         for key in required_keys:
             if key not in training_config:
@@ -198,14 +198,30 @@ class ConfigSchema:
         if batch_size > 1024:
             raise ConfigValidationError(f"training.batch_size is too large (max 1024), got {batch_size}")
         
-        # Validate learning_rate
-        lr = training_config['learning_rate']
-        if not isinstance(lr, (int, float)):
-            raise ConfigValidationError(f"training.learning_rate must be a number, got {type(lr)}")
-        if lr <= 0:
-            raise ConfigValidationError(f"training.learning_rate must be positive, got {lr}")
-        if lr > 1.0:
-            raise ConfigValidationError(f"training.learning_rate is too large (max 1.0), got {lr}")
+        # Validate learning rates (encoder, decoder, discriminator)
+        lr_keys = ['lr_enc', 'lr_dec', 'lr_disc']
+        for lr_key in lr_keys:
+            if lr_key in training_config:
+                lr = training_config[lr_key]
+                if not isinstance(lr, (int, float)):
+                    raise ConfigValidationError(f"training.{lr_key} must be a number, got {type(lr)}")
+                if lr <= 0:
+                    raise ConfigValidationError(f"training.{lr_key} must be positive, got {lr}")
+                if lr > 1.0:
+                    raise ConfigValidationError(f"training.{lr_key} is too large (max 1.0), got {lr}")
+        
+        # Validate beta values for optimizer
+        if 'betas' in training_config:
+            betas = training_config['betas']
+            if not isinstance(betas, list):
+                raise ConfigValidationError(f"training.betas must be a list, got {type(betas)}")
+            if len(betas) != 2:
+                raise ConfigValidationError(f"training.betas must have exactly 2 values, got {len(betas)}")
+            for i, beta in enumerate(betas):
+                if not isinstance(beta, (int, float)):
+                    raise ConfigValidationError(f"training.betas[{i}] must be a number, got {type(beta)}")
+                if beta < 0 or beta > 1:
+                    raise ConfigValidationError(f"training.betas[{i}] must be in [0, 1], got {beta}")
         
         # Validate epochs
         epochs = training_config['epochs']

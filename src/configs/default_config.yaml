@@ -152,6 +152,6 @@ training:
 # ==================================
 # ==    Generation Settings       ==
 # ==================================
-
+generation:
   # Number of shapes to generate when running with --generate
   sample_count: 8
