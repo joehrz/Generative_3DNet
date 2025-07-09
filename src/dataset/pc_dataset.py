@@ -4,6 +4,7 @@ import os
 import torch
 import numpy as np
 from torch.utils.data import Dataset
+from src.utils.validation import validate_point_cloud_tensor, validate_file_path, ValidationError
 class PointCloudDataset(Dataset):
     """
     A dataset class for point-cloud data (optionally with RGB).
@@ -29,8 +30,11 @@ class PointCloudDataset(Dataset):
         self.root = root
         self.transform = transform
 
-        if not os.path.isdir(self.root):
-            raise ValueError(f"Provided root directory does not exist: {self.root}")
+        # Validate root directory
+        try:
+            validate_file_path(self.root, "root directory", check_exists=True)
+        except ValidationError as e:
+            raise ValueError(str(e))
 
         self.files = sorted(
             f
@@ -58,7 +62,7 @@ class PointCloudDataset(Dataset):
                 else:
                     pc_np = data[list(data.keys())[0]]
             elif file_path.endswith('.pt'):
-                tensor_data = torch.load(file_path)
+                tensor_data = torch.load(file_path, map_location='cpu', weights_only=True)
                 pc_np = tensor_data.cpu().numpy() if isinstance(tensor_data, torch.Tensor) else np.array(tensor_data)
             elif file_path.endswith('.txt'):
                 pc_np = np.loadtxt(file_path)
@@ -66,12 +70,29 @@ class PointCloudDataset(Dataset):
                 raise ValueError(f"Unsupported file format: {file_path}")
 
             pc_tensor = torch.from_numpy(pc_np.astype(np.float32))
+            
+            # Validate the loaded point cloud
+            try:
+                pc_tensor = validate_point_cloud_tensor(
+                    pc_tensor,
+                    name=f"point_cloud_{file_path}",
+                    min_points=10,
+                    max_points=50000,
+                    allow_batch=False
+                )
+            except ValidationError as e:
+                raise ValueError(f"Invalid point cloud in {file_path}: {e}")
 
             if self.transform:
                 pc_tensor = self.transform(pc_tensor)
 
             return pc_tensor
 
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Point cloud file not found: {file_path}")
+        except np.load as e:
+            raise ValueError(f"Error loading numpy file {file_path}: {e}")
+        except torch.jit.RecursiveScriptModule as e:
+            raise ValueError(f"Error loading PyTorch file {file_path}: {e}")
         except Exception as e:
-            print(f"Error loading file {file_path}: {e}")
-            raise e
+            raise RuntimeError(f"Unexpected error loading file {file_path}: {e}")
