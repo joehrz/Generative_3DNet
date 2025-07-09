@@ -10,6 +10,7 @@ import math
 from src.models.bi_net import BiNet
 from src.utils.losses import gradient_penalty, nnme_loss
 from src.utils.emd.emd_module import emdModule
+from src.utils.profiler import TrainingProfiler, profile_function, profile_context
 
 def compute_gradient_norm(parameters):
     """
@@ -31,6 +32,7 @@ def compute_gradient_norm(parameters):
             total_norm += param_norm.item() ** 2
     return math.sqrt(total_norm)
 
+@profile_function("validate_binet")
 def validate_binet(model, val_loader, device, emd_eps, emd_iters):
     """
     Evaluates the model's autoencoder reconstruction performance on a validation set.
@@ -41,13 +43,19 @@ def validate_binet(model, val_loader, device, emd_eps, emd_iters):
 
     with torch.no_grad():
         for real_points in val_loader:
-            real_points = real_points.to(device)
-            B = real_points.size(0)
-            latent = model.encode(real_points)
-            rec_points = model.decode(latent)
-            emd_val, _ = emd_fn(rec_points, real_points, emd_eps, emd_iters)
-            total_loss += emd_val.mean().item() * B
-            total_samples += B
+            with profile_context("validation_batch"):
+                real_points = real_points.to(device)
+                B = real_points.size(0)
+                
+                with profile_context("validation_forward"):
+                    latent = model.encode(real_points)
+                    rec_points = model.decode(latent)
+                    
+                with profile_context("validation_emd"):
+                    emd_val, _ = emd_fn(rec_points, real_points, emd_eps, emd_iters)
+                    
+                total_loss += emd_val.mean().item() * B
+                total_samples += B
 
     model.train()
     return total_loss / max(total_samples, 1)
