@@ -13,6 +13,10 @@ import os
 import numpy as np
 import open3d as o3d
 from typing import Tuple, Optional
+from src.utils.exceptions import (
+    PreprocessingError, PointCloudError, FileIOError, 
+    DataError, BiNetError
+)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -75,9 +79,11 @@ def farthest_point_sampling(points: np.ndarray, k: int) -> np.ndarray:
 
     for i in range(1, k):
         current_pt = points[current]
+        # More memory-efficient distance calculation
         diff = points - current_pt
-        dist_sq = np.einsum('ij,ij->i', diff, diff)
-        dist = np.minimum(dist, dist_sq)
+        dist_sq = np.sum(diff * diff, axis=1)
+        # Update minimum distances in-place
+        np.minimum(dist, dist_sq, out=dist)
         current = np.argmax(dist)
         sampled_indices[i] = current
 
@@ -98,9 +104,12 @@ def adjust_point_count(pcd: o3d.geometry.PointCloud, num_points: int, use_fps: b
     if N == num_points:
         return pcd
     elif N < num_points:
+        # More memory-efficient upsampling
         extra = num_points - N
-        repeat_idx = np.random.randint(0, N, extra)
-        final_indices = np.concatenate([np.arange(N), repeat_idx])
+        repeat_idx = np.random.choice(N, extra, replace=True)
+        final_indices = np.empty(num_points, dtype=np.int64)
+        final_indices[:N] = np.arange(N)
+        final_indices[N:] = repeat_idx
         np.random.shuffle(final_indices)
     else:
         if use_fps:
@@ -166,27 +175,42 @@ def preprocess_point_clouds(
         try:
             # 1) Load step
             if ext == ".ply":
-                pcd = o3d.io.read_point_cloud(fpath)
+                try:
+                    pcd = o3d.io.read_point_cloud(fpath)
+                    if len(pcd.points) == 0:
+                        raise PointCloudError(f"Empty point cloud loaded from {fpath}")
+                except Exception as e:
+                    raise FileIOError(f"Failed to load PLY file {fpath}: {e}")
+                    
             elif ext == ".txt":
-                pts = load_plant_point_cloud(fpath)
-                if pts.size > 0 and pts.shape[1] == 3:
+                try:
+                    pts = load_plant_point_cloud(fpath)
+                    if pts.size == 0:
+                        raise PointCloudError(f"Empty point cloud loaded from {fpath}")
+                    if pts.shape[1] != 3:
+                        raise PointCloudError(f"Point cloud must have 3 coordinates, got {pts.shape[1]} in {fpath}")
                     pcd = o3d.geometry.PointCloud()
                     pcd.points = o3d.utility.Vector3dVector(pts)
+                except Exception as e:
+                    raise FileIOError(f"Failed to load TXT file {fpath}: {e}")
+                    
             elif ext == ".npz":
-                data = np.load(fpath)
-                keys = list(data.keys())
-                if "points" in data:
-                    pts = data["points"]
-                    cols = data.get("colors")
-                elif "pc" in data:
-                    pts = data["pc"]
-                    cols = data.get("colors")
-                elif keys:
-                    pts = data[keys[0]]
-                    cols = None
-                else:
-                    logger.warning(f"No arrays found in {fpath}")
-                    continue
+                try:
+                    data = np.load(fpath)
+                    keys = list(data.keys())
+                    if "points" in data:
+                        pts = data["points"]
+                        cols = data.get("colors")
+                    elif "pc" in data:
+                        pts = data["pc"]
+                        cols = data.get("colors")
+                    elif keys:
+                        pts = data[keys[0]]
+                        cols = None
+                    else:
+                        raise DataError(f"No valid arrays found in {fpath}")
+                except Exception as e:
+                    raise FileIOError(f"Failed to load NPZ file {fpath}: {e}")
 
                 if pts.ndim == 2 and pts.shape[1] == 3:
                     pcd = o3d.geometry.PointCloud()
