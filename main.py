@@ -77,6 +77,7 @@ def parse_args():
     parser.add_argument("--train", action="store_true", help="Train the BI-Net model.")
     parser.add_argument("--eval", action="store_true", help="Evaluate a trained model.")
     parser.add_argument("--generate", action="store_true", help="Generate shapes from random noise.")
+    parser.add_argument("--cross-validate", action="store_true", help="Run k-fold cross-validation for small datasets.")
     
     # --- Overrides & General Options ---
     parser.add_argument(
@@ -154,7 +155,44 @@ def main():
             logger.error(f"An error occurred during dataset splitting: {e}", exc_info=True)
             sys.exit(1)
 
-    # Stage 3c: Training, Evaluation, or Generation
+    # Stage 3c: Cross-validation
+    if getattr(args, 'cross_validate', False):
+        logger.info("--- Stage: K-Fold Cross-Validation ---")
+        
+        # Override config with command-line args if provided
+        if args.device:
+            config.training.device = args.device
+            logger.info(f"Overriding device with command-line argument: {args.device}")
+
+        try:
+            from src.utils.cross_validation import k_fold_cross_validation, save_best_fold_model
+            from src.dataset.pc_dataset import PointCloudDataset
+            from src.utils.pc_utils import PointCloudAugmentation
+            
+            # Load full dataset for cross-validation
+            full_dataset = PointCloudDataset(root=config.data.processed_dir)
+            
+            # Run cross-validation
+            cv_results = k_fold_cross_validation(
+                dataset=full_dataset,
+                config=config,
+                logger=logger,
+                k_folds=getattr(config.training, 'cv_folds', 5),
+                random_state=getattr(config.training, 'cv_random_state', 42)
+            )
+            
+            # Save best model if cross-validation was successful
+            if cv_results['cv_stats'] is not None:
+                best_model_path = os.path.join(config.model.save_dir, "best_cv_model.pth")
+                save_best_fold_model(cv_results, config, best_model_path)
+                logger.info(f"Best cross-validation model saved to: {best_model_path}")
+            
+            logger.info("Cross-validation finished successfully.")
+        except Exception as e:
+            logger.error(f"An error occurred during cross-validation: {e}", exc_info=True)
+            sys.exit(1)
+
+    # Stage 3d: Training, Evaluation, or Generation
     if args.train or args.eval or args.generate:
         logger.info("--- Stage: Model Training / Inference ---")
         
