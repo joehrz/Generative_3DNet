@@ -37,8 +37,19 @@ class emdFunction(Function):
 
         assert(n == m)
         assert(xyz1.size()[0] == xyz2.size()[0])
-        assert(n % 1024 == 0)
-        assert(batchsize <= 512)
+        
+        # More flexible constraints with fallback options
+        if n % 1024 != 0:
+            # Pad to nearest multiple of 1024
+            pad_size = 1024 - (n % 1024)
+            xyz1 = torch.nn.functional.pad(xyz1, (0, 0, 0, pad_size), mode='replicate')
+            xyz2 = torch.nn.functional.pad(xyz2, (0, 0, 0, pad_size), mode='replicate')
+            n = n + pad_size
+            m = m + pad_size
+            
+        if batchsize > 512:
+            # Process in chunks for large batches
+            raise ValueError(f"Batch size {batchsize} exceeds maximum 512. Consider processing in smaller batches.")
 
         xyz1 = xyz1.contiguous().float().cuda()
         xyz2 = xyz2.contiguous().float().cuda()
@@ -76,7 +87,29 @@ class emdModule(nn.Module):
         super(emdModule, self).__init__()
 
     def forward(self, input1, input2, eps, iters):
-        return emdFunction.apply(input1, input2, eps, iters)
+        # Handle large batches by processing in chunks
+        batchsize = input1.size(0)
+        if batchsize > 512:
+            # Process in chunks of 512
+            chunk_size = 512
+            all_dists = []
+            all_assignments = []
+            
+            for i in range(0, batchsize, chunk_size):
+                end_idx = min(i + chunk_size, batchsize)
+                chunk_input1 = input1[i:end_idx]
+                chunk_input2 = input2[i:end_idx]
+                
+                dist, assignment = emdFunction.apply(chunk_input1, chunk_input2, eps, iters)
+                all_dists.append(dist)
+                all_assignments.append(assignment)
+            
+            # Concatenate results
+            final_dist = torch.cat(all_dists, dim=0)
+            final_assignment = torch.cat(all_assignments, dim=0)
+            return final_dist, final_assignment
+        else:
+            return emdFunction.apply(input1, input2, eps, iters)
 
 def test_emd():
     x1 = torch.rand(20, 8192, 3).cuda() # please normalize your point cloud to [0, 1]
