@@ -95,7 +95,7 @@ def gradient_penalty(discriminator, real_points, fake_points, device='cuda'):
     alpha = torch.rand(real_points.size(0), 1, 1, device=device)
     alpha = alpha.expand_as(real_points)
     interpolates = alpha * real_points + (1 - alpha) * fake_points
-    interpolates.requires_grad(True)
+    interpolates.requires_grad = True
 
     disc_interpolates = discriminator(interpolates)
     grad_outputs = torch.ones_like(disc_interpolates)
