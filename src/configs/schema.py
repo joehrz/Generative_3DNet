@@ -277,6 +277,33 @@ class ConfigSchema:
         return training_config
     
     @staticmethod
+    def validate_generation_config(generation_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate generation configuration section.
+        
+        Args:
+            generation_config: Generation configuration dictionary
+            
+        Returns:
+            Dict[str, Any]: Validated generation configuration
+            
+        Raises:
+            ConfigValidationError: If validation fails
+        """
+        if not isinstance(generation_config, dict):
+            raise ConfigValidationError(f"Generation configuration must be a dictionary, got {type(generation_config)}")
+        
+        # Validate sample_count
+        if 'sample_count' in generation_config:
+            sample_count = generation_config['sample_count']
+            if not isinstance(sample_count, int):
+                raise ConfigValidationError(f"generation.sample_count must be an integer, got {type(sample_count)}")
+            if sample_count <= 0:
+                raise ConfigValidationError(f"generation.sample_count must be positive, got {sample_count}")
+        
+        return generation_config
+    
+    @staticmethod
     def validate_full_config(config: Dict[str, Any]) -> Dict[str, Any]:
         """
         Validate the complete configuration.
@@ -309,6 +336,9 @@ class ConfigSchema:
         # Validate optional sections
         if 'preprocessing' in config:
             validated_config['preprocessing'] = ConfigSchema.validate_preprocessing_config(config['preprocessing'])
+        
+        if 'generation' in config:
+            validated_config['generation'] = ConfigSchema.validate_generation_config(config['generation'])
         
         # Copy other sections without validation
         for key, value in config.items():

@@ -33,6 +33,7 @@ class Config:
             self.preprocessing = ConfigDict(cfg.get('preprocessing', {}))
             self.training = ConfigDict(cfg.get('training', {}))
             self.model = ConfigDict(cfg.get('model', {}))
+            self.generation = ConfigDict(cfg.get('generation', {}))
         except Exception as e:
             raise ConfigValidationError(f"Failed to parse configuration sections: {e}")
 
