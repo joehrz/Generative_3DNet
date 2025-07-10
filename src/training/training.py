@@ -205,7 +205,7 @@ def run_training_pipeline(config, logger, do_train=False, do_eval=False, do_gene
     if do_generate:
         logger.info("[INFO] Generating random shapes from the trained model.")
         binet.eval()
-        sample_count = config.training.sample_count
+        sample_count = config.generation.sample_count
         z = torch.randn(sample_count, config.model.latent_dim, device=device)
         with torch.no_grad():
             fake_points = binet.generate(z)
