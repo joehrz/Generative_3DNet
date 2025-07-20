@@ -55,5 +55,4 @@ runs
 
 # Model
 .pth
-models/checkpoints# Last updated: Thu Jul 10 07:07:50 CDT 2025
-CLAUDE.md
+models/checkpoints
